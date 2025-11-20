@@ -1,17 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScrollView, StyleSheet, View, TextInput, TouchableOpacity, Dimensions, useWindowDimensions, Platform } from 'react-native';
+import { ScrollView, StyleSheet, View, TextInput, TouchableOpacity, Dimensions, useWindowDimensions } from 'react-native';
 import { Text, Card, Menu } from 'react-native-paper';
 import Svg, { Path } from 'react-native-svg';
 import { useFinance } from '../data/FinanceContext';
 import { Investment, Frequency } from '../types/finance';
 import { investmentTemplates } from '../data/financeTemplates';
 import { financeColors } from '../theme/colors';
-
-// Only import LineChart on web platform
-let LineChart: any = null;
-if (Platform.OS === 'web') {
-  LineChart = require('react-native-chart-kit').LineChart;
-}
 
 const frequencyLabels: Record<Frequency, string> = {
   '1x': 'Einmalig',
@@ -576,43 +570,11 @@ export const PrognoseScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                {Platform.OS === 'web' ? (
-                  <LineChart
-                    data={chartData}
-                    width={Math.min(screenWidth / 2 - 40, 500)}
-                    height={300}
-                    chartConfig={{
-                      backgroundColor: '#fff',
-                      backgroundGradientFrom: '#fff',
-                      backgroundGradientTo: '#fff',
-                      decimalPlaces: 0,
-                      color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                      labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                      style: {
-                        borderRadius: 16
-                      },
-                      propsForDots: {
-                        r: '4',
-                        strokeWidth: '2'
-                      },
-                      propsForBackgroundLines: {
-                        strokeDasharray: ''
-                      },
-                      propsForLabels: {
-                        fontFamily: 'System',
-                        fontSize: 12
-                      }
-                    }}
-                    bezier
-                    style={styles.chart}
-                  />
-                ) : (
-                  <View style={{ padding: 20, alignItems: 'center' }}>
-                    <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
-                      Vermögensprognose-Chart ist nur in der Web-Version verfügbar
-                    </Text>
-                  </View>
-                )}
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
+                    Chart-Visualisierung wird geladen...
+                  </Text>
+                </View>
               </Card.Content>
             </Card>
           </View>
@@ -965,43 +927,11 @@ export const PrognoseScreen: React.FC = () => {
                 </Text>
               </View>
 
-              {Platform.OS === 'web' ? (
-                <LineChart
-                  data={chartData}
-                  width={screenWidth - 50}
-                  height={280}
-                  chartConfig={{
-                    backgroundColor: '#fff',
-                    backgroundGradientFrom: '#fff',
-                    backgroundGradientTo: '#fff',
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                    style: {
-                      borderRadius: 16
-                    },
-                    propsForDots: {
-                      r: '4',
-                      strokeWidth: '2'
-                    },
-                    propsForBackgroundLines: {
-                      strokeDasharray: ''
-                    },
-                    propsForLabels: {
-                      fontFamily: 'System',
-                      fontSize: 12
-                    }
-                  }}
-                  bezier
-                  style={styles.chart}
-                />
-              ) : (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
-                    Vermögensprognose-Chart ist nur in der Web-Version verfügbar
-                  </Text>
-                </View>
-              )}
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
+                  Chart-Visualisierung wird geladen...
+                </Text>
+              </View>
             </Card.Content>
           </Card>
 
