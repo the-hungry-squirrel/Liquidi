@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScrollView, StyleSheet, View, TextInput, TouchableOpacity, Dimensions, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, TextInput, TouchableOpacity, Dimensions, useWindowDimensions, Platform } from 'react-native';
 import { Text, Card, Menu } from 'react-native-paper';
 import { LineChart } from 'react-native-chart-kit';
 import Svg, { Path } from 'react-native-svg';
@@ -571,35 +571,43 @@ export const PrognoseScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                <LineChart
-                  data={chartData}
-                  width={Math.min(screenWidth / 2 - 40, 500)}
-                  height={300}
-                  chartConfig={{
-                    backgroundColor: '#fff',
-                    backgroundGradientFrom: '#fff',
-                    backgroundGradientTo: '#fff',
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                    style: {
-                      borderRadius: 16
-                    },
-                    propsForDots: {
-                      r: '4',
-                      strokeWidth: '2'
-                    },
-                    propsForBackgroundLines: {
-                      strokeDasharray: ''
-                    },
-                    propsForLabels: {
-                      fontFamily: 'System',
-                      fontSize: 12
-                    }
-                  }}
-                  bezier
-                  style={styles.chart}
-                />
+                {Platform.OS === 'web' ? (
+                  <LineChart
+                    data={chartData}
+                    width={Math.min(screenWidth / 2 - 40, 500)}
+                    height={300}
+                    chartConfig={{
+                      backgroundColor: '#fff',
+                      backgroundGradientFrom: '#fff',
+                      backgroundGradientTo: '#fff',
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                      style: {
+                        borderRadius: 16
+                      },
+                      propsForDots: {
+                        r: '4',
+                        strokeWidth: '2'
+                      },
+                      propsForBackgroundLines: {
+                        strokeDasharray: ''
+                      },
+                      propsForLabels: {
+                        fontFamily: 'System',
+                        fontSize: 12
+                      }
+                    }}
+                    bezier
+                    style={styles.chart}
+                  />
+                ) : (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
+                      Vermögensprognose-Chart ist nur in der Web-Version verfügbar
+                    </Text>
+                  </View>
+                )}
               </Card.Content>
             </Card>
           </View>
@@ -952,35 +960,43 @@ export const PrognoseScreen: React.FC = () => {
                 </Text>
               </View>
 
-              <LineChart
-                data={chartData}
-                width={screenWidth - 50}
-                height={280}
-                chartConfig={{
-                  backgroundColor: '#fff',
-                  backgroundGradientFrom: '#fff',
-                  backgroundGradientTo: '#fff',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  style: {
-                    borderRadius: 16
-                  },
-                  propsForDots: {
-                    r: '4',
-                    strokeWidth: '2'
-                  },
-                  propsForBackgroundLines: {
-                    strokeDasharray: ''
-                  },
-                  propsForLabels: {
-                    fontFamily: 'System',
-                    fontSize: 12
-                  }
-                }}
-                bezier
-                style={styles.chart}
-              />
+              {Platform.OS === 'web' ? (
+                <LineChart
+                  data={chartData}
+                  width={screenWidth - 50}
+                  height={280}
+                  chartConfig={{
+                    backgroundColor: '#fff',
+                    backgroundGradientFrom: '#fff',
+                    backgroundGradientTo: '#fff',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    style: {
+                      borderRadius: 16
+                    },
+                    propsForDots: {
+                      r: '4',
+                      strokeWidth: '2'
+                    },
+                    propsForBackgroundLines: {
+                      strokeDasharray: ''
+                    },
+                    propsForLabels: {
+                      fontFamily: 'System',
+                      fontSize: 12
+                    }
+                  }}
+                  bezier
+                  style={styles.chart}
+                />
+              ) : (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
+                    Vermögensprognose-Chart ist nur in der Web-Version verfügbar
+                  </Text>
+                </View>
+              )}
             </Card.Content>
           </Card>
 
