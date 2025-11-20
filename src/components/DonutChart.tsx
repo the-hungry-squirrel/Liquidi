@@ -127,9 +127,6 @@ export const DonutChart: React.FC<DonutChartProps> = ({
               fill={segment.color}
               stroke="#fff"
               strokeWidth={2}
-              onMouseEnter={() => handleSegmentHover(segment.name)}
-              onMouseLeave={() => handleSegmentHover(null)}
-              style={{ cursor: 'pointer' }}
             />
           ))}
 
