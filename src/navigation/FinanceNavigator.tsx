@@ -8,7 +8,7 @@ import { theme } from '../theme/theme';
 // Screens
 import { FinanceOverviewScreen } from '../screens/FinanceOverviewScreen';
 import { AnalysisScreen } from '../screens/AnalysisScreen';
-import { PrognoseScreen } from '../screens/PrognoseScreen';
+import { PrognoseScreenWrapper } from '../screens/PrognoseScreenWrapper';
 
 // Logo Header Component
 const LogoHeader = () => (
@@ -71,7 +71,7 @@ export default function FinanceNavigator() {
         />
         <Tab.Screen
           name="Prognose"
-          component={PrognoseScreen}
+          component={PrognoseScreenWrapper}
           options={{
             headerTitle: () => <LogoHeader />,
             headerTitleAlign: 'center',
