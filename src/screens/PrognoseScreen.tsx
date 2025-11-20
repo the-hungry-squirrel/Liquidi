@@ -1,12 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, TextInput, TouchableOpacity, Dimensions, useWindowDimensions, Platform } from 'react-native';
 import { Text, Card, Menu } from 'react-native-paper';
-import { LineChart } from 'react-native-chart-kit';
 import Svg, { Path } from 'react-native-svg';
 import { useFinance } from '../data/FinanceContext';
 import { Investment, Frequency } from '../types/finance';
 import { investmentTemplates } from '../data/financeTemplates';
 import { financeColors } from '../theme/colors';
+
+// Only import LineChart on web platform
+let LineChart: any = null;
+if (Platform.OS === 'web') {
+  LineChart = require('react-native-chart-kit').LineChart;
+}
 
 const frequencyLabels: Record<Frequency, string> = {
   '1x': 'Einmalig',
