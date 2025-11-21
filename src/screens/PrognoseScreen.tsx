@@ -490,61 +490,6 @@ export const PrognoseScreen: React.FC = () => {
         <View style={styles.desktopContainer}>
           {/* Left Column: Vermögensprognose Chart */}
           <View style={styles.desktopLeftColumn}>
-            {/* Prognosezeitraum und Inflation Card */}
-            <Card style={styles.card}>
-              <Card.Content>
-                <View style={styles.prognoseInputRow}>
-                  <View style={styles.prognoseInputBlock}>
-                    <Text style={styles.prognoseInputLabel}>Prognosezeitraum:</Text>
-                    {editingField === 'years' ? (
-                      <TextInput
-                        style={styles.prognoseInput}
-                        value={prognoseData.yearsToProject.toString()}
-                        onChangeText={(text) =>
-                          updatePrognoseData({
-                            ...prognoseData,
-                            yearsToProject: parseInt(text) || 10
-                          })
-                        }
-                        onBlur={() => setEditingField(null)}
-                        keyboardType="number-pad"
-                        autoFocus
-                      />
-                    ) : (
-                      <TouchableOpacity onPress={() => setEditingField('years')}>
-                        <Text style={styles.prognoseInputValue}>{prognoseData.yearsToProject} Jahre</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  <View style={styles.prognoseInputBlock}>
-                    <Text style={styles.prognoseInputLabel}>Inflationsrate / Jahr:</Text>
-                    {editingField === 'inflation' ? (
-                      <TextInput
-                        style={styles.prognoseInput}
-                        value={prognoseData.inflationRate.toString()}
-                        onChangeText={(text) => {
-                          const cleanText = text.replace(',', '.');
-                          const value = parseFloat(cleanText);
-                          updatePrognoseData({
-                            ...prognoseData,
-                            inflationRate: isNaN(value) ? 0 : value
-                          });
-                        }}
-                        onBlur={() => setEditingField(null)}
-                        keyboardType="decimal-pad"
-                        autoFocus
-                      />
-                    ) : (
-                      <TouchableOpacity onPress={() => setEditingField('inflation')}>
-                        <Text style={styles.prognoseInputValue}>{prognoseData.inflationRate.toFixed(1)} %</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </Card.Content>
-            </Card>
-
             {/* Vermögensprognose Chart */}
             <Card style={[styles.card, styles.squareCard]}>
               <Card.Content>
@@ -1459,7 +1404,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: financeColors.textPrimary,
-    paddingVertical: 8
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: financeColors.incomeLight,
+    borderRadius: 8,
+    minWidth: 100,
+    textAlign: 'center'
   },
   overviewRow: {
     flexDirection: 'row',

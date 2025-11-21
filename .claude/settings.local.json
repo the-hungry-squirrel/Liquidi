@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run web:*)",
+      "Bash(timeout:*)",
+      "Bash(npx expo start:*)",
+      "Bash(git commit:*)",
+      "Bash(taskkill:*)",
+      "Bash(nul)",
+      "Bash(git restore:*)",
+      "Bash(git add:*)",
+      "Bash(npx tsc:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(git push:*)",
+      "Bash(copy:*)",
+      "Bash(node -e:*)",
+      "Bash(git revert:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
