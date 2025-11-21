@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Line, Circle, G, Text as SvgText } from 'react-native-svg';
 import { financeColors } from '../theme/colors';
 import { OakGrowth } from './OakGrowth';
@@ -18,11 +18,20 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   years,
   liquidValues,
   investmentValues,
-  width = Dimensions.get('window').width - 64,
+  width: propWidth,
   height = 300,
   inflationRate = 2.0,
   realReturnRate = 0
 }) => {
+  // Use window dimensions for responsive layout
+  const windowDimensions = useWindowDimensions();
+  const [width, setWidth] = useState(propWidth || windowDimensions.width - 64);
+
+  // Update width when window or prop changes
+  useEffect(() => {
+    setWidth(propWidth || windowDimensions.width - 64);
+  }, [propWidth, windowDimensions.width]);
+
   // Year filter options: 1, 5, 10, 15 years
   const [selectedYears, setSelectedYears] = useState<number>(10);
   const yearOptions = [1, 5, 10, 15];
@@ -150,10 +159,10 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
       {/* Chart with Oak Background */}
       <View style={styles.chartContainer}>
-        {/* Oak Tree Background - positioned in center of chart */}
+        {/* Oak Tree Background - positioned responsive to chart */}
         <View style={[styles.oakBackground, {
-          top: zeroLineY - (chartHeight * 2.4) + (chartHeight / 5) * 2.3 + 80,
-          left: padding.left + chartWidth / 2 + 115
+          top: zeroLineY - (chartHeight * 2.4) + (chartHeight / 5) * 2.3 + (chartHeight * 0.27),
+          left: padding.left + (chartWidth * 0.5) + (chartWidth * 0.24)
         }]}>
           <OakGrowth
             stage={oakInfo.stage}
