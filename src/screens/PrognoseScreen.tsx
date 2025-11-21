@@ -6,6 +6,7 @@ import { useFinance } from '../data/FinanceContext';
 import { Investment, Frequency } from '../types/finance';
 import { investmentTemplates } from '../data/financeTemplates';
 import { financeColors } from '../theme/colors';
+import { WealthChart } from '../components/WealthChart';
 
 const frequencyLabels: Record<Frequency, string> = {
   '1x': 'Einmalig',
@@ -570,11 +571,11 @@ export const PrognoseScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
-                    Chart-Visualisierung wird geladen...
-                  </Text>
-                </View>
+                <WealthChart
+                  years={years}
+                  liquidValues={liquidValues}
+                  investmentValues={investmentValues}
+                />
               </Card.Content>
             </Card>
           </View>
@@ -927,11 +928,11 @@ export const PrognoseScreen: React.FC = () => {
                 </Text>
               </View>
 
-              <View style={{ padding: 20, alignItems: 'center' }}>
-                <Text style={{ color: financeColors.textSecondary, textAlign: 'center' }}>
-                  Chart-Visualisierung wird geladen...
-                </Text>
-              </View>
+              <WealthChart
+                years={years}
+                liquidValues={liquidValues}
+                investmentValues={investmentValues}
+              />
             </Card.Content>
           </Card>
 
