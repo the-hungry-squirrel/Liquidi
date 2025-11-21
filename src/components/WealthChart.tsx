@@ -11,6 +11,7 @@ interface WealthChartProps {
   width?: number;
   height?: number;
   inflationRate?: number;
+  realReturnRate?: number;
 }
 
 export const WealthChart: React.FC<WealthChartProps> = ({
@@ -19,7 +20,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   investmentValues,
   width = Dimensions.get('window').width - 64,
   height = 300,
-  inflationRate = 2.0
+  inflationRate = 2.0,
+  realReturnRate = 0
 }) => {
   // Year filter options: 1, 5, 10, 15 years
   const [selectedYears, setSelectedYears] = useState<number>(10);
@@ -43,17 +45,16 @@ export const WealthChart: React.FC<WealthChartProps> = ({
     ? ((finalValue - initialValue) / initialValue) * 100 / selectedYears
     : 0;
 
-  // Determine oak tree stage and health
+  // Determine oak tree stage and health based on Realrendite
   const getOakStage = (): { stage: 1 | 2 | 3 | 4 | 'squirrel', isHealthy: boolean } => {
-    const threshold = inflationRate + 2;
-
-    // Show squirrel if growth <= inflation
-    if (annualGrowthRate <= inflationRate) {
+    // Use realReturnRate: <1% = sick oak, <=0% = squirrel
+    // Show squirrel if real return <= 0%
+    if (realReturnRate <= 0) {
       return { stage: 'squirrel', isHealthy: false };
     }
 
-    // Show sick oak if growth <= inflation + 2%
-    const isHealthy = annualGrowthRate > threshold;
+    // Show sick oak if real return < 1%
+    const isHealthy = realReturnRate >= 1.0;
 
     // Determine stage based on selected years
     if (selectedYears === 1) return { stage: 1, isHealthy };
@@ -66,13 +67,9 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
   // Debug logging
   console.log('Oak Tree Debug:', {
-    annualGrowthRate: annualGrowthRate.toFixed(2) + '%',
-    inflationRate: inflationRate + '%',
-    threshold: (inflationRate + 2) + '%',
+    realReturnRate: realReturnRate.toFixed(2) + '%',
     stage: oakInfo.stage,
     isHealthy: oakInfo.isHealthy,
-    initialValue,
-    finalValue,
     selectedYears
   });
 

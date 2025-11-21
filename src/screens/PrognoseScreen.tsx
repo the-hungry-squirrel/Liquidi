@@ -577,6 +577,7 @@ export const PrognoseScreen: React.FC = () => {
                   investmentValues={investmentValues}
                   width={480}
                   inflationRate={prognoseData.inflationRate}
+                  realReturnRate={returns.year1.realReturn / totalValues[0] * 100}
                 />
               </Card.Content>
             </Card>
@@ -936,6 +937,7 @@ export const PrognoseScreen: React.FC = () => {
                 investmentValues={investmentValues}
                 width={Dimensions.get('window').width - 80}
                 inflationRate={prognoseData.inflationRate}
+                realReturnRate={returns.year1.realReturn / totalValues[0] * 100}
               />
             </Card.Content>
           </Card>
