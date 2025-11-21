@@ -1,10 +1,10 @@
 # Liquidi - Finance Tracking App
 
-Eine React Native/Expo App zur visuellen Verfolgung von Finanzen mit Eichel-basierten Visualisierungen.
+Eine React Native/Expo App zur visuellen Verfolgung von Finanzen mit witzigen Visualisierungen.
 
 ## Features
 
-- **Übersichtsseite**: Visualisierung von Einnahmen, Ausgaben und Ersparnissen mit skalierbaren Eichel-Grafiken
+- **Übersichtsseite**: Visualisierung von Einnahmen, Ausgaben und Ersparnissen 
 - **Analyse**: Detaillierte Verteilungsdiagramme für Einnahmen und Ausgaben
 - **Prognose**: Vermögensprognose mit interaktiven Charts für flüssiges und investiertes Vermögen
 - **Investment-Tracking**: Automatische Berechnung von Investment-Renditen
