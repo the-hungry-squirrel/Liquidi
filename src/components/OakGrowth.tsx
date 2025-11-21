@@ -50,10 +50,9 @@ export const OakGrowth: React.FC<OakGrowthProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
     alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.15,
+    justifyContent: 'flex-end',
+    opacity: 0.2,
     zIndex: 0
   },
   image: {

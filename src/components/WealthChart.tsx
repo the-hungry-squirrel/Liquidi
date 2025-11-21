@@ -138,13 +138,17 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
       {/* Chart with Oak Background */}
       <View style={styles.chartContainer}>
-        {/* Oak Tree Background */}
-        <View style={styles.oakBackground}>
+        {/* Oak Tree Background - positioned at bottom (0€ line) */}
+        <View style={[styles.oakBackground, {
+          bottom: padding.bottom,
+          left: maxWidth / 2,
+          top: 'auto'
+        }]}>
           <OakGrowth
             stage={oakInfo.stage}
             isHealthy={oakInfo.isHealthy}
-            width={maxWidth * 0.6}
-            height={height * 0.8}
+            width={chartHeight}
+            height={chartHeight}
           />
         </View>
 
@@ -295,11 +299,11 @@ const styles = StyleSheet.create({
   },
   oakBackground: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: '-50%' }, { translateY: '-50%' }],
+    transform: [{ translateX: '-50%' }],
     zIndex: 0,
-    pointerEvents: 'none'
+    pointerEvents: 'none',
+    alignItems: 'center',
+    justifyContent: 'flex-end'
   },
   legend: {
     flexDirection: 'row',
