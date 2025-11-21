@@ -342,16 +342,23 @@ export const PrognoseScreen: React.FC = () => {
     const totalPeriodInflationLoss = totalInflationLossSum;
     const totalPeriodRealReturn = totalPeriodNominalReturn - totalPeriodInflationLoss;
 
+    // Calculate average annual return rate
+    const totalInvestedYear1 = prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0);
+    const avgYear1ReturnRate = totalInvestedYear1 > 0 ? (year1NominalReturn / totalInvestedYear1) * 100 : 0;
+    const realReturnRateYear1 = avgYear1ReturnRate - prognoseData.inflationRate;
+
     return {
       year1: {
         nominalReturn: year1NominalReturn,
         inflationLoss: year1InflationLoss,
-        realReturn: year1RealReturn
+        realReturn: year1RealReturn,
+        realReturnRate: realReturnRateYear1
       },
       fullPeriod: {
         nominalReturn: totalPeriodNominalReturn,
         inflationLoss: totalPeriodInflationLoss,
-        realReturn: totalPeriodRealReturn
+        realReturn: totalPeriodRealReturn,
+        realReturnRate: realReturnRateYear1 // Verwende die gleiche Rate für Konsistenz
       }
     };
   };
@@ -577,7 +584,7 @@ export const PrognoseScreen: React.FC = () => {
                   investmentValues={investmentValues}
                   width={480}
                   inflationRate={prognoseData.inflationRate}
-                  realReturnRate={(returns.year1.realReturn / (prognoseData.liquidAssets + prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0))) * 100}
+                  realReturnRate={returns.year1.realReturnRate}
                 />
               </Card.Content>
             </Card>
@@ -937,7 +944,7 @@ export const PrognoseScreen: React.FC = () => {
                 investmentValues={investmentValues}
                 width={Dimensions.get('window').width - 80}
                 inflationRate={prognoseData.inflationRate}
-                realReturnRate={(returns.year1.realReturn / (prognoseData.liquidAssets + prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0))) * 100}
+                realReturnRate={returns.year1.realReturnRate}
               />
             </Card.Content>
           </Card>
@@ -1244,7 +1251,7 @@ export const PrognoseScreen: React.FC = () => {
                   ]}
                 />
                 <Text style={[styles.barValueText, { fontWeight: 'bold' }]}>
-                  {Math.round(returns.year1.realReturn)} € ({((returns.year1.realReturn / (prognoseData.liquidAssets + prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0))) * 100).toFixed(2)}%)
+                  {Math.round(returns.year1.realReturn)} € ({returns.year1.realReturnRate.toFixed(2)}%)
                 </Text>
               </View>
             </View>
@@ -1302,7 +1309,7 @@ export const PrognoseScreen: React.FC = () => {
                   ]}
                 />
                 <Text style={[styles.barValueText, { fontWeight: 'bold' }]}>
-                  {Math.round(returns.fullPeriod.realReturn)} € ({((returns.fullPeriod.realReturn / (totalValues[totalValues.length - 1])) * 100).toFixed(2)}%)
+                  {Math.round(returns.fullPeriod.realReturn)} € ({returns.fullPeriod.realReturnRate.toFixed(2)}%)
                 </Text>
               </View>
             </View>
