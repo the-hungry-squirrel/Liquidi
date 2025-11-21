@@ -143,7 +143,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
       <View style={styles.chartContainer}>
         {/* Oak Tree Background - positioned in center of chart */}
         <View style={[styles.oakBackground, {
-          top: zeroLineY - (chartHeight * 2.4) + (chartHeight / 5) * 2.3 + 50,
+          top: zeroLineY - (chartHeight * 2.4) + (chartHeight / 5) * 2.3 + 65,
           left: padding.left + chartWidth / 2 + 115
         }]}>
           <OakGrowth
