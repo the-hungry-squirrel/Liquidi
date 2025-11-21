@@ -141,9 +141,9 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
       {/* Chart with Oak Background */}
       <View style={styles.chartContainer}>
-        {/* Oak Tree Background - positioned at 0€ line */}
+        {/* Oak Tree Background - positioned with bottom at 0€ line */}
         <View style={[styles.oakBackground, {
-          top: zeroLineY,
+          top: zeroLineY - chartHeight,
           left: padding.left + chartWidth / 2
         }]}>
           <OakGrowth
