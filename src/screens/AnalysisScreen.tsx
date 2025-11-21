@@ -203,7 +203,10 @@ export const AnalysisScreen: React.FC = () => {
             <View style={styles.acornTextOverlay}>
               <Text style={[
                 styles.ratingPercentage,
-                { fontSize: Math.round(savingsRate) >= 10 ? 38 : 48 }
+                {
+                  fontSize: Math.round(savingsRate) >= 100 ? 32 :
+                           Math.round(savingsRate) >= 10 ? 38 : 48
+                }
               ]}>
                 {Math.round(savingsRate)}%
               </Text>
