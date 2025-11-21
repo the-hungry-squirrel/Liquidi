@@ -81,6 +81,9 @@ export const WealthChart: React.FC<WealthChartProps> = ({
     return padding.top + chartHeight * (1 - normalized);
   };
 
+  // Calculate Y position for 0€ line
+  const zeroLineY = getY(0);
+
   // Helper function to get X coordinate
   const getX = (index: number) => {
     return padding.left + (chartWidth / (filteredYears.length - 1)) * index;
@@ -138,10 +141,10 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
       {/* Chart with Oak Background */}
       <View style={styles.chartContainer}>
-        {/* Oak Tree Background - positioned at bottom (0€ line) */}
+        {/* Oak Tree Background - positioned at 0€ line */}
         <View style={[styles.oakBackground, {
-          bottom: padding.bottom,
-          left: maxWidth / 2
+          top: zeroLineY,
+          left: padding.left + chartWidth / 2
         }]}>
           <OakGrowth
             stage={oakInfo.stage}
