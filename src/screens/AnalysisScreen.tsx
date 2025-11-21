@@ -197,7 +197,7 @@ export const AnalysisScreen: React.FC = () => {
           <View style={styles.acornContainer}>
             <AcornIcon
               color={ratingInfo.color}
-              size={360}
+              size={180}
               isEmpty={isCritical}
             />
             <View style={styles.acornTextOverlay}>
@@ -206,10 +206,7 @@ export const AnalysisScreen: React.FC = () => {
           </View>
           <View style={styles.ratingTextContainer}>
             <Text style={[styles.ratingCategoryLarge, { color: ratingInfo.color }]}>
-              {ratingInfo.category}!
-            </Text>
-            <Text style={styles.ratingMessage}>
-              {ratingInfo.message}
+              {ratingInfo.category}! {ratingInfo.message}
             </Text>
           </View>
         </View>
@@ -452,8 +449,8 @@ const styles = StyleSheet.create({
     gap: 40
   },
   acornContainer: {
-    width: 360,
-    height: 360,
+    width: 180,
+    height: 180,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative'
@@ -468,12 +465,9 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   ratingPercentage: {
-    fontSize: 64,
+    fontSize: 48,
     fontWeight: 'bold',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3
+    color: '#fff'
   },
   ratingTextContainer: {
     flex: 1,
