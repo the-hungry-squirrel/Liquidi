@@ -40,15 +40,15 @@ interface AcornStackProps {
   maxAcorns?: number; // Maximum number of acorns across all three sections (for uniform scaling)
 }
 
-// Empty acorn component (uses acorn-empty.svg file)
+// Empty acorn component - Original SVG mit 10% Helligkeitsfilter
 const EmptyAcorn: React.FC<AcornProps> = ({ size = 120 }) => {
   const { Image } = require('react-native');
 
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={{ width: size, height: size, opacity: 1.1 }}>
       <Image
-        source={require('../../assets/acorn-empty.svg')}
-        style={{ width: size, height: size }}
+        source={require('../../assets/Eichel4Claud_Leer4.svg')}
+        style={{ width: size, height: size, tintColor: undefined }}
         resizeMode="contain"
       />
     </View>

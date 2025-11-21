@@ -197,11 +197,13 @@ export const AnalysisScreen: React.FC = () => {
           <View style={styles.acornContainer}>
             {/* Hellgrauer Kreis Hintergrund */}
             <View style={styles.acornCircleBackground} />
-            <AcornIcon
-              color={ratingInfo.color}
-              size={180}
-              isEmpty={isCritical}
-            />
+            <View style={styles.acornIconWrapper}>
+              <AcornIcon
+                color={ratingInfo.color}
+                size={180}
+                isEmpty={isCritical}
+              />
+            </View>
             <View style={styles.acornTextOverlay}>
               <Text style={[
                 styles.ratingPercentage,
@@ -470,6 +472,16 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     backgroundColor: '#d3d3d3',
     zIndex: 0
+  },
+  acornIconWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1
   },
   acornTextOverlay: {
     position: 'absolute',
