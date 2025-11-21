@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Svg, { Path, Line, Circle, G, Text as SvgText } from 'react-native-svg';
 import { financeColors } from '../theme/colors';
+import { OakGrowth } from './OakGrowth';
 
 interface WealthChartProps {
   years: number[];
@@ -9,6 +10,7 @@ interface WealthChartProps {
   investmentValues: number[];
   width?: number;
   height?: number;
+  inflationRate?: number;
 }
 
 export const WealthChart: React.FC<WealthChartProps> = ({
@@ -16,15 +18,54 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   liquidValues,
   investmentValues,
   width = Dimensions.get('window').width - 64,
-  height = 300
+  height = 300,
+  inflationRate = 2.0
 }) => {
+  // Year filter options: 1, 5, 10, 15 years
+  const [selectedYears, setSelectedYears] = useState<number>(10);
+  const yearOptions = [1, 5, 10, 15];
+
+  // Filter data based on selected years
+  const dataEndIndex = Math.min(selectedYears, years.length - 1);
+  const filteredYears = years.slice(0, dataEndIndex + 1);
+  const filteredLiquidValues = liquidValues.slice(0, dataEndIndex + 1);
+  const filteredInvestmentValues = investmentValues.slice(0, dataEndIndex + 1);
+
   // Ensure the chart doesn't overflow by adding extra margin
   const maxWidth = width - 40; // Subtract extra space to prevent overflow
   // Calculate total values
-  const totalValues = liquidValues.map((liquid, index) => liquid + investmentValues[index]);
+  const totalValues = filteredLiquidValues.map((liquid, index) => liquid + filteredInvestmentValues[index]);
+
+  // Calculate growth rate (annualized)
+  const initialValue = totalValues[0];
+  const finalValue = totalValues[totalValues.length - 1];
+  const annualGrowthRate = selectedYears > 0
+    ? ((finalValue - initialValue) / initialValue) * 100 / selectedYears
+    : 0;
+
+  // Determine oak tree stage and health
+  const getOakStage = (): { stage: 1 | 2 | 3 | 4 | 'squirrel', isHealthy: boolean } => {
+    const threshold = inflationRate + 2;
+
+    // Show squirrel if growth <= inflation
+    if (annualGrowthRate <= inflationRate) {
+      return { stage: 'squirrel', isHealthy: false };
+    }
+
+    // Show sick oak if growth <= inflation + 2%
+    const isHealthy = annualGrowthRate > threshold;
+
+    // Determine stage based on selected years
+    if (selectedYears === 1) return { stage: 1, isHealthy };
+    if (selectedYears === 5) return { stage: 2, isHealthy };
+    if (selectedYears === 10) return { stage: 3, isHealthy };
+    return { stage: 4, isHealthy };
+  };
+
+  const oakInfo = getOakStage();
 
   // Find min and max for scaling
-  const allValues = [...totalValues, ...liquidValues, ...investmentValues];
+  const allValues = [...totalValues, ...filteredLiquidValues, ...filteredInvestmentValues];
   const maxValue = Math.max(...allValues);
   const minValue = Math.min(...allValues, 0);
   const valueRange = maxValue - minValue;
@@ -42,7 +83,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
   // Helper function to get X coordinate
   const getX = (index: number) => {
-    return padding.left + (chartWidth / (years.length - 1)) * index;
+    return padding.left + (chartWidth / (filteredYears.length - 1)) * index;
   };
 
   // Create path data for each line
@@ -74,7 +115,40 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
   return (
     <View style={styles.container}>
-      <Svg width={maxWidth} height={height}>
+      {/* Year Slider */}
+      <View style={styles.sliderContainer}>
+        {yearOptions.map((yearOption) => (
+          <TouchableOpacity
+            key={yearOption}
+            style={[
+              styles.yearButton,
+              selectedYears === yearOption && styles.yearButtonActive
+            ]}
+            onPress={() => setSelectedYears(yearOption)}
+          >
+            <Text style={[
+              styles.yearButtonText,
+              selectedYears === yearOption && styles.yearButtonTextActive
+            ]}>
+              {yearOption} {yearOption === 1 ? 'Jahr' : 'Jahre'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Chart with Oak Background */}
+      <View style={styles.chartContainer}>
+        {/* Oak Tree Background */}
+        <View style={styles.oakBackground}>
+          <OakGrowth
+            stage={oakInfo.stage}
+            isHealthy={oakInfo.isHealthy}
+            width={maxWidth * 0.6}
+            height={height * 0.8}
+          />
+        </View>
+
+        <Svg width={maxWidth} height={height}>
         {/* Grid lines */}
         {yTickValues.map((tickValue, index) => {
           const y = getY(tickValue);
@@ -103,8 +177,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
         })}
 
         {/* X-axis labels */}
-        {years.map((year, index) => {
-          if (index % Math.max(1, Math.floor(years.length / 6)) === 0 || index === years.length - 1) {
+        {filteredYears.map((year, index) => {
+          if (index % Math.max(1, Math.floor(filteredYears.length / 6)) === 0 || index === filteredYears.length - 1) {
             const x = getX(index);
             return (
               <SvgText
@@ -124,7 +198,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
         {/* Investment line (bottom layer) */}
         <Path
-          d={createPath(investmentValues)}
+          d={createPath(filteredInvestmentValues)}
           stroke="#22c55e"
           strokeWidth={2}
           fill="none"
@@ -132,7 +206,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
         {/* Liquid line (middle layer) */}
         <Path
-          d={createPath(liquidValues)}
+          d={createPath(filteredLiquidValues)}
           stroke="#3b82f6"
           strokeWidth={2}
           fill="none"
@@ -161,6 +235,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
           );
         })}
       </Svg>
+      </View>
 
       {/* Legend */}
       <View style={styles.legend}>
@@ -186,6 +261,45 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginTop: 24,
     overflow: 'hidden'
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 16,
+    gap: 8
+  },
+  yearButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: financeColors.divider,
+    backgroundColor: 'transparent'
+  },
+  yearButtonActive: {
+    backgroundColor: financeColors.primary,
+    borderColor: financeColors.primary
+  },
+  yearButtonText: {
+    fontSize: 12,
+    color: financeColors.textSecondary,
+    fontWeight: '500'
+  },
+  yearButtonTextActive: {
+    color: '#fff',
+    fontWeight: '600'
+  },
+  chartContainer: {
+    position: 'relative',
+    alignItems: 'center'
+  },
+  oakBackground: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: '-50%' }, { translateY: '-50%' }],
+    zIndex: 0,
+    pointerEvents: 'none'
   },
   legend: {
     flexDirection: 'row',

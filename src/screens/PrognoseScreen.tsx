@@ -576,6 +576,7 @@ export const PrognoseScreen: React.FC = () => {
                   liquidValues={liquidValues}
                   investmentValues={investmentValues}
                   width={480}
+                  inflationRate={prognoseData.inflationRate}
                 />
               </Card.Content>
             </Card>
@@ -934,6 +935,7 @@ export const PrognoseScreen: React.FC = () => {
                 liquidValues={liquidValues}
                 investmentValues={investmentValues}
                 width={Dimensions.get('window').width - 80}
+                inflationRate={prognoseData.inflationRate}
               />
             </Card.Content>
           </Card>
