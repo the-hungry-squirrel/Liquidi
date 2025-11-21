@@ -184,7 +184,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 16,
-    marginTop: 24
+    marginTop: 24,
+    overflow: 'hidden'
   },
   legend: {
     flexDirection: 'row',

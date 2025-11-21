@@ -575,6 +575,7 @@ export const PrognoseScreen: React.FC = () => {
                   years={years}
                   liquidValues={liquidValues}
                   investmentValues={investmentValues}
+                  width={480}
                 />
               </Card.Content>
             </Card>
@@ -932,6 +933,7 @@ export const PrognoseScreen: React.FC = () => {
                 years={years}
                 liquidValues={liquidValues}
                 investmentValues={investmentValues}
+                width={Dimensions.get('window').width - 80}
               />
             </Card.Content>
           </Card>
