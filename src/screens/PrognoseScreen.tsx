@@ -577,7 +577,7 @@ export const PrognoseScreen: React.FC = () => {
                   investmentValues={investmentValues}
                   width={480}
                   inflationRate={prognoseData.inflationRate}
-                  realReturnRate={returns.year1.realReturn / totalValues[0] * 100}
+                  realReturnRate={(returns.year1.realReturn / (prognoseData.liquidAssets + prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0))) * 100}
                 />
               </Card.Content>
             </Card>
@@ -937,7 +937,7 @@ export const PrognoseScreen: React.FC = () => {
                 investmentValues={investmentValues}
                 width={Dimensions.get('window').width - 80}
                 inflationRate={prognoseData.inflationRate}
-                realReturnRate={returns.year1.realReturn / totalValues[0] * 100}
+                realReturnRate={(returns.year1.realReturn / (prognoseData.liquidAssets + prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0))) * 100}
               />
             </Card.Content>
           </Card>
@@ -1244,7 +1244,7 @@ export const PrognoseScreen: React.FC = () => {
                   ]}
                 />
                 <Text style={[styles.barValueText, { fontWeight: 'bold' }]}>
-                  {Math.round(returns.year1.realReturn)} €
+                  {Math.round(returns.year1.realReturn)} € ({((returns.year1.realReturn / (prognoseData.liquidAssets + prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0))) * 100).toFixed(2)}%)
                 </Text>
               </View>
             </View>
@@ -1302,7 +1302,7 @@ export const PrognoseScreen: React.FC = () => {
                   ]}
                 />
                 <Text style={[styles.barValueText, { fontWeight: 'bold' }]}>
-                  {Math.round(returns.fullPeriod.realReturn)} €
+                  {Math.round(returns.fullPeriod.realReturn)} € ({((returns.fullPeriod.realReturn / (totalValues[totalValues.length - 1])) * 100).toFixed(2)}%)
                 </Text>
               </View>
             </View>
