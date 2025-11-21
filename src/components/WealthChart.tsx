@@ -64,6 +64,18 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
   const oakInfo = getOakStage();
 
+  // Debug logging
+  console.log('Oak Tree Debug:', {
+    annualGrowthRate: annualGrowthRate.toFixed(2) + '%',
+    inflationRate: inflationRate + '%',
+    threshold: (inflationRate + 2) + '%',
+    stage: oakInfo.stage,
+    isHealthy: oakInfo.isHealthy,
+    initialValue,
+    finalValue,
+    selectedYears
+  });
+
   // Find min and max for scaling
   const allValues = [...totalValues, ...filteredLiquidValues, ...filteredInvestmentValues];
   const maxValue = Math.max(...allValues);
