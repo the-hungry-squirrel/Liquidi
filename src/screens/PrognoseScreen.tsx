@@ -749,9 +749,11 @@ export const PrognoseScreen: React.FC = () => {
                                   <TextInput
                                     style={styles.investmentInput}
                                     value={investment.annualReturn.toString()}
-                                    onChangeText={(text) =>
-                                      handleUpdateInvestment(investment.id, 'annualReturn', parseFloat(text) || 0)
-                                    }
+                                    onChangeText={(text) => {
+                                      const cleanText = text.replace(',', '.');
+                                      const value = parseFloat(cleanText);
+                                      handleUpdateInvestment(investment.id, 'annualReturn', isNaN(value) ? 0 : value);
+                                    }}
                                     onBlur={() => setEditingField(null)}
                                     keyboardType="decimal-pad"
                                     autoFocus
@@ -1096,9 +1098,11 @@ export const PrognoseScreen: React.FC = () => {
                           <TextInput
                             style={styles.investmentInput}
                             value={investment.annualReturn.toString()}
-                            onChangeText={(text) =>
-                              handleUpdateInvestment(investment.id, 'annualReturn', parseFloat(text) || 0)
-                            }
+                            onChangeText={(text) => {
+                              const cleanText = text.replace(',', '.');
+                              const value = parseFloat(cleanText);
+                              handleUpdateInvestment(investment.id, 'annualReturn', isNaN(value) ? 0 : value);
+                            }}
                             onBlur={() => setEditingField(null)}
                             keyboardType="decimal-pad"
                             autoFocus

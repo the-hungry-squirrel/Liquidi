@@ -168,7 +168,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
         {/* Oak Tree Background - positioned responsive to chart */}
         <View style={[styles.oakBackground, {
           top: zeroLineY - (chartHeight * 2.4) + (chartHeight / 5) * 2.3 + (chartHeight * 0.27),
-          left: padding.left + (chartWidth * 0.5) + (chartWidth * 0.24)
+          left: getX(dataEndIndex)
         }]}>
           <OakGrowth
             stage={oakInfo.stage}
