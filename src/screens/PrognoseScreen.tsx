@@ -1203,6 +1203,57 @@ export const PrognoseScreen: React.FC = () => {
         <Card.Content>
           <Text style={styles.sectionTitle}>Rendite-Übersicht</Text>
 
+          {/* Prognosezeitraum und Inflation */}
+          <View style={styles.prognoseInputRow}>
+            <View style={styles.prognoseInputBlock}>
+              <Text style={styles.prognoseInputLabel}>Prognosezeitraum:</Text>
+              {editingField === 'years' ? (
+                <TextInput
+                  style={styles.prognoseInput}
+                  value={prognoseData.yearsToProject.toString()}
+                  onChangeText={(text) =>
+                    updatePrognoseData({
+                      ...prognoseData,
+                      yearsToProject: parseInt(text) || 10
+                    })
+                  }
+                  onBlur={() => setEditingField(null)}
+                  keyboardType="number-pad"
+                  autoFocus
+                />
+              ) : (
+                <TouchableOpacity onPress={() => setEditingField('years')}>
+                  <Text style={styles.prognoseInputValue}>{prognoseData.yearsToProject} Jahre</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.prognoseInputBlock}>
+              <Text style={styles.prognoseInputLabel}>Inflation:</Text>
+              {editingField === 'inflation' ? (
+                <TextInput
+                  style={styles.prognoseInput}
+                  value={prognoseData.inflationRate.toString()}
+                  onChangeText={(text) => {
+                    const cleanText = text.replace(',', '.');
+                    const value = parseFloat(cleanText);
+                    updatePrognoseData({
+                      ...prognoseData,
+                      inflationRate: isNaN(value) ? 2.0 : value
+                    });
+                  }}
+                  onBlur={() => setEditingField(null)}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+              ) : (
+                <TouchableOpacity onPress={() => setEditingField('inflation')}>
+                  <Text style={styles.prognoseInputValue}>{prognoseData.inflationRate.toFixed(1)} %</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
           {/* Jahr 1 Bar Chart */}
           <View style={styles.barChartContainer}>
             <Text style={styles.barChartLabel}>Jahr 1</Text>
@@ -1805,7 +1856,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   barChartContainer: {
-    marginVertical: 16
+    marginVertical: 16,
+    width: '100%',
+    maxWidth: '100%'
   },
   barChartLabel: {
     fontSize: 16,
@@ -1814,7 +1867,9 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   barRow: {
-    marginBottom: 12
+    marginBottom: 12,
+    flexDirection: 'column',
+    width: '100%'
   },
   barLabelText: {
     fontSize: 13,
@@ -1824,7 +1879,9 @@ const styles = StyleSheet.create({
   barContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 32
+    height: 32,
+    flex: 1,
+    overflow: 'hidden'
   },
   bar: {
     height: '100%',
