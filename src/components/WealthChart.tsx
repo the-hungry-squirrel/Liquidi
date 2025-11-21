@@ -82,6 +82,12 @@ export const WealthChart: React.FC<WealthChartProps> = ({
     selectedYears
   });
 
+  console.log('Investment Growth Debug:', {
+    investmentValues: filteredInvestmentValues,
+    years: filteredYears,
+    liquidValues: filteredLiquidValues
+  });
+
   // Find min and max for scaling
   const allValues = [...totalValues, ...filteredLiquidValues, ...filteredInvestmentValues];
   const maxValue = Math.max(...allValues);
