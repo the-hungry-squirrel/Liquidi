@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View, Dimensions, TouchableOpacity, useWindowDi
 import { Text, Card } from 'react-native-paper';
 import { useFinance } from '../data/FinanceContext';
 import { DonutChart } from '../components/DonutChart';
+import { AcornIcon } from '../components/AcornIcon';
 import { financeColors } from '../theme/colors';
 
 const screenWidth = Dimensions.get('window').width;
@@ -185,22 +186,36 @@ export const AnalysisScreen: React.FC = () => {
   const totalIncome = getTotalIncome() + investmentReturns;
 
   // Sparquoten-Card Content (nur Bewertung, keine Aufschlüsselung)
-  const SavingsRateContent = () => (
-    <>
-      <Text style={styles.cardTitle}>Sparquote</Text>
-      <View style={styles.ratingContainerCentered}>
-        <View style={[styles.ratingCircle, { backgroundColor: ratingInfo.color }]}>
-          <Text style={styles.ratingPercentage}>{savingsRate.toFixed(1)}%</Text>
+  const SavingsRateContent = () => {
+    // Bestimme, ob kritisch (< 3%) - dann leere Eichel, sonst volle Eichel
+    const isCritical = savingsRate < 3;
+
+    return (
+      <>
+        <Text style={styles.cardTitle}>Sparquote</Text>
+        <View style={styles.ratingContainerHorizontal}>
+          <View style={styles.acornContainer}>
+            <AcornIcon
+              color={ratingInfo.color}
+              size={360}
+              isEmpty={isCritical}
+            />
+            <View style={styles.acornTextOverlay}>
+              <Text style={styles.ratingPercentage}>{Math.round(savingsRate)}%</Text>
+            </View>
+          </View>
+          <View style={styles.ratingTextContainer}>
+            <Text style={[styles.ratingCategoryLarge, { color: ratingInfo.color }]}>
+              {ratingInfo.category}!
+            </Text>
+            <Text style={styles.ratingMessage}>
+              {ratingInfo.message}
+            </Text>
+          </View>
         </View>
-        <Text style={[styles.ratingCategoryLarge, { color: ratingInfo.color }]}>
-          {ratingInfo.category}!
-        </Text>
-        <Text style={styles.ratingMessage}>
-          {ratingInfo.message}
-        </Text>
-      </View>
-    </>
-  );
+      </>
+    );
+  };
 
   // Einnahmenverteilung Card Content (kleiner)
   const IncomeDistributionContent = () => (
@@ -429,18 +444,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 24
   },
-  ratingCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  ratingContainerHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 40
+  },
+  acornContainer: {
+    width: 360,
+    height: 360,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20
+    position: 'relative'
+  },
+  acornTextOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   ratingPercentage: {
-    fontSize: 28,
+    fontSize: 64,
     fontWeight: 'bold',
-    color: '#fff'
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3
+  },
+  ratingTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-start'
   },
   ratingInfo: {
     flex: 1
