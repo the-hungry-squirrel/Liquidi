@@ -195,6 +195,8 @@ export const AnalysisScreen: React.FC = () => {
         <Text style={styles.cardTitle}>Sparquote</Text>
         <View style={styles.ratingContainerCentered}>
           <View style={styles.acornContainer}>
+            {/* Hellgrauer Kreis Hintergrund */}
+            <View style={styles.acornCircleBackground} />
             <AcornIcon
               color={ratingInfo.color}
               size={180}
@@ -461,6 +463,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative'
   },
+  acornCircleBackground: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#d3d3d3',
+    zIndex: 0
+  },
   acornTextOverlay: {
     position: 'absolute',
     top: 0,
@@ -468,7 +478,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    zIndex: 2
   },
   ratingPercentage: {
     fontSize: 48,

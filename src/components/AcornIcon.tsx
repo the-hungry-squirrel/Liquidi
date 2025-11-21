@@ -20,7 +20,7 @@ export const AcornIcon: React.FC<AcornIconProps> = ({ color, size = 360, isEmpty
     return (
       <View style={{ width: actualSize, height: actualSize }}>
         <Image
-          source={require('../../assets/Eichel4Claud_Leer4.svg')}
+          source={require('../../assets/acorn-empty.svg')}
           style={[styles.image, { width: actualSize, height: actualSize }]}
           resizeMode="contain"
         />
