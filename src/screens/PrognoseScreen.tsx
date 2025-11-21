@@ -1900,7 +1900,7 @@ const styles = StyleSheet.create({
   liquidInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 12,
     paddingHorizontal: 0,
     backgroundColor: 'transparent',
@@ -1910,7 +1910,8 @@ const styles = StyleSheet.create({
   liquidInfoLabel: {
     fontSize: 14,
     color: financeColors.textSecondary,
-    flex: 1
+    flex: 1,
+    textAlign: 'left'
   },
   liquidInfoValue: {
     fontSize: 15,

@@ -193,7 +193,7 @@ export const AnalysisScreen: React.FC = () => {
     return (
       <>
         <Text style={styles.cardTitle}>Sparquote</Text>
-        <View style={styles.ratingContainerHorizontal}>
+        <View style={styles.ratingContainerCentered}>
           <View style={styles.acornContainer}>
             <AcornIcon
               color={ratingInfo.color}
@@ -201,14 +201,17 @@ export const AnalysisScreen: React.FC = () => {
               isEmpty={isCritical}
             />
             <View style={styles.acornTextOverlay}>
-              <Text style={styles.ratingPercentage}>{Math.round(savingsRate)}%</Text>
+              <Text style={[
+                styles.ratingPercentage,
+                { fontSize: Math.round(savingsRate) >= 10 ? 38 : 48 }
+              ]}>
+                {Math.round(savingsRate)}%
+              </Text>
             </View>
           </View>
-          <View style={styles.ratingTextContainer}>
-            <Text style={[styles.ratingCategoryLarge, { color: ratingInfo.color }]}>
-              {ratingInfo.category}! {ratingInfo.message}
-            </Text>
-          </View>
+          <Text style={[styles.ratingCategoryMedium, { color: ratingInfo.color }]}>
+            {ratingInfo.category}! {ratingInfo.message}
+          </Text>
         </View>
       </>
     );
@@ -486,6 +489,12 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: 'bold',
     textTransform: 'uppercase'
+  },
+  ratingCategoryMedium: {
+    fontSize: 34,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 16
   },
   ratingMessage: {
     fontSize: 18,

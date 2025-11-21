@@ -42,8 +42,8 @@ interface AcornStackProps {
 
 // Empty acorn component (filled design for negative/zero amounts)
 const EmptyAcorn: React.FC<AcornProps> = ({ size = 120 }) => {
-  const mainColor = '#FFB5A3'; // Pink/coral color for deficit
-  const lighterColor = adjustColorBrightness(mainColor, 15);
+  const mainColor = '#b3b3b3'; // Medium gray for empty acorn
+  const lighterColor = '#e6e6e6'; // Light gray for highlights
 
   return (
     <Svg width={size} height={size} viewBox="0 0 1024 1024">
@@ -84,27 +84,11 @@ function adjustColorBrightness(color: string, percent: number): string {
 }
 
 export const AcornStack: React.FC<AcornStackProps> = ({ amount, maxAcorns }) => {
-  // Show empty acorn for zero or negative amounts
-  if (amount <= 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.acornsContainer}>
-          <EmptyAcorn size={120} />
-        </View>
-      </View>
-    );
-  }
-
   // Calculate number of acorns (1 acorn = 500€)
-  const totalAcorns = Math.floor(amount / 500);
-
-  // Don't show anything if less than 500€
-  if (totalAcorns === 0) {
-    return <View style={styles.container} />;
-  }
+  const totalAcorns = Math.floor(Math.abs(amount) / 500);
 
   // Use maxAcorns if provided, otherwise use totalAcorns for scaling decision
-  const acornsForScaling = maxAcorns !== undefined ? maxAcorns : totalAcorns;
+  const acornsForScaling = maxAcorns !== undefined ? maxAcorns : Math.max(totalAcorns, 1);
 
   // Scale down acorns if there are 10 or more in ANY section
   // Base size is 120, but reduce to 60 (50% smaller) if we have 10 or more acorns
@@ -131,6 +115,17 @@ export const AcornStack: React.FC<AcornStackProps> = ({ amount, maxAcorns }) => 
     const scaleFactor = maxWidth / widthForMaxAcorns;
     finalSize = Math.floor(acornSize * scaleFactor);
     finalSpacing = Math.floor(horizontalSpacing * scaleFactor);
+  }
+
+  // Show empty acorn for zero, negative amounts, or positive amounts less than 500€
+  if (amount < 500) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.acornsContainer}>
+          <EmptyAcorn size={finalSize} />
+        </View>
+      </View>
+    );
   }
 
   return (

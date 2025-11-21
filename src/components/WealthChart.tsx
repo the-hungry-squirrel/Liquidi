@@ -18,6 +18,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   width = Dimensions.get('window').width - 64,
   height = 300
 }) => {
+  // Ensure the chart doesn't overflow by adding extra margin
+  const maxWidth = width - 40; // Subtract extra space to prevent overflow
   // Calculate total values
   const totalValues = liquidValues.map((liquid, index) => liquid + investmentValues[index]);
 
@@ -28,8 +30,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   const valueRange = maxValue - minValue;
 
   // Chart dimensions
-  const padding = { top: 20, right: 20, bottom: 40, left: 60 };
-  const chartWidth = width - padding.left - padding.right;
+  const padding = { top: 20, right: 40, bottom: 40, left: 60 };
+  const chartWidth = maxWidth - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   // Helper function to get Y coordinate
@@ -72,7 +74,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
   return (
     <View style={styles.container}>
-      <Svg width={width} height={height}>
+      <Svg width={maxWidth} height={height}>
         {/* Grid lines */}
         {yTickValues.map((tickValue, index) => {
           const y = getY(tickValue);
@@ -81,7 +83,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
               <Line
                 x1={padding.left}
                 y1={y}
-                x2={width - padding.right}
+                x2={maxWidth - padding.right}
                 y2={y}
                 stroke="#e5e7eb"
                 strokeWidth={1}
@@ -108,7 +110,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
               <SvgText
                 key={`year-${index}`}
                 x={x}
-                y={height - padding.bottom + 20}
+                y={height - padding.bottom + 15}
                 fontSize={10}
                 fill={financeColors.textSecondary}
                 textAnchor="middle"
@@ -181,7 +183,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 16
+    paddingVertical: 16,
+    marginTop: 24
   },
   legend: {
     flexDirection: 'row',
