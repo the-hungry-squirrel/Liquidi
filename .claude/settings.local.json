@@ -16,7 +16,8 @@
       "Bash(copy:*)",
       "Bash(node -e:*)",
       "Bash(git revert:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
