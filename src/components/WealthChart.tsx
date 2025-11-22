@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Line, Circle, G, Text as SvgText } from 'react-native-svg';
 import { financeColors } from '../theme/colors';
-import { OakGrowth } from './OakGrowth';
 
 interface WealthChartProps {
   years: number[];
@@ -10,8 +9,7 @@ interface WealthChartProps {
   investmentValues: number[];
   width?: number;
   height?: number;
-  inflationRate?: number;
-  realReturnRate?: number;
+  onYearsChange?: (years: number) => void; // Callback wenn Jahre sich ändern
 }
 
 export const WealthChart: React.FC<WealthChartProps> = ({
@@ -20,8 +18,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   investmentValues,
   width: propWidth,
   height = 300,
-  inflationRate = 2.0,
-  realReturnRate = 0
+  onYearsChange
 }) => {
   // Use window dimensions for responsive layout
   const windowDimensions = useWindowDimensions();
@@ -53,40 +50,6 @@ export const WealthChart: React.FC<WealthChartProps> = ({
   const annualGrowthRate = selectedYears > 0
     ? ((finalValue - initialValue) / initialValue) * 100 / selectedYears
     : 0;
-
-  // Determine oak tree stage and health based on Realrendite
-  const getOakStage = (): { stage: 1 | 2 | 3 | 4 | 'squirrel', isHealthy: boolean } => {
-    // Use realReturnRate: <1% = sick oak, <=0% = squirrel
-    // Show squirrel if real return <= 0%
-    if (realReturnRate <= 0) {
-      return { stage: 'squirrel', isHealthy: false };
-    }
-
-    // Show sick oak if real return < 1%
-    const isHealthy = realReturnRate >= 1.0;
-
-    // Determine stage based on selected years
-    if (selectedYears === 1) return { stage: 1, isHealthy };
-    if (selectedYears === 5) return { stage: 2, isHealthy };
-    if (selectedYears === 10) return { stage: 3, isHealthy };
-    return { stage: 4, isHealthy };
-  };
-
-  const oakInfo = getOakStage();
-
-  // Debug logging
-  console.log('Oak Tree Debug:', {
-    realReturnRate: realReturnRate.toFixed(2) + '%',
-    stage: oakInfo.stage,
-    isHealthy: oakInfo.isHealthy,
-    selectedYears
-  });
-
-  console.log('Investment Growth Debug:', {
-    investmentValues: filteredInvestmentValues,
-    years: filteredYears,
-    liquidValues: filteredLiquidValues
-  });
 
   // Find min and max for scaling
   const allValues = [...totalValues, ...filteredLiquidValues, ...filteredInvestmentValues];
@@ -151,7 +114,10 @@ export const WealthChart: React.FC<WealthChartProps> = ({
               styles.yearButton,
               selectedYears === yearOption && styles.yearButtonActive
             ]}
-            onPress={() => setSelectedYears(yearOption)}
+            onPress={() => {
+              setSelectedYears(yearOption);
+              onYearsChange?.(yearOption); // Callback aufrufen
+            }}
           >
             <Text style={[
               styles.yearButtonText,
@@ -163,21 +129,8 @@ export const WealthChart: React.FC<WealthChartProps> = ({
         ))}
       </View>
 
-      {/* Chart with Oak Background */}
+      {/* Chart */}
       <View style={styles.chartContainer}>
-        {/* Oak Tree Background - positioned responsive to chart */}
-        <View style={[styles.oakBackground, {
-          top: zeroLineY - (chartHeight * 2.4) + (chartHeight / 5) * 2.3 + (chartHeight * 0.27),
-          left: getX(dataEndIndex)
-        }]}>
-          <OakGrowth
-            stage={oakInfo.stage}
-            isHealthy={oakInfo.isHealthy}
-            width={chartHeight * 2.4}
-            height={chartHeight * 2.4}
-          />
-        </View>
-
         <Svg width={maxWidth} height={height}>
         {/* Grid lines */}
         {yTickValues.map((tickValue, index) => {
@@ -322,14 +275,6 @@ const styles = StyleSheet.create({
   chartContainer: {
     position: 'relative',
     alignItems: 'center'
-  },
-  oakBackground: {
-    position: 'absolute',
-    transform: [{ translateX: '-50%' }],
-    zIndex: 0,
-    pointerEvents: 'none',
-    alignItems: 'center',
-    justifyContent: 'flex-end'
   },
   legend: {
     flexDirection: 'row',

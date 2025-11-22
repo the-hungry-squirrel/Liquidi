@@ -39,6 +39,7 @@ export interface Investment {
   annualReturn: number; // in Prozent
   frequency: Frequency; // Wie oft wird investiert
   reinvestEnabled?: boolean; // Ob Erträge reinvestiert werden (optional für Rückwärtskompatibilität)
+  durationMonths?: number; // Dauer der Einzahlungen in Monaten (null = unbegrenzt, nur für wiederkehrende Investments)
 }
 
 export interface PrognoseData {

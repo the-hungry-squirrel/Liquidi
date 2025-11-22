@@ -7,6 +7,7 @@ import { Investment, Frequency } from '../types/finance';
 import { investmentTemplates } from '../data/financeTemplates';
 import { financeColors } from '../theme/colors';
 import { WealthChart } from '../components/WealthChart';
+import { OakGrowthWindow } from '../components/OakGrowthWindow';
 
 const frequencyLabels: Record<Frequency, string> = {
   '1x': 'Einmalig',
@@ -40,17 +41,19 @@ export const PrognoseScreen: React.FC = () => {
   const [frequencyMenuVisible, setFrequencyMenuVisible] = useState<{ [id: string]: boolean }>({});
   const [nameMenuVisible, setNameMenuVisible] = useState<{ [id: string]: boolean }>({});
   const [validationErrors, setValidationErrors] = useState<{ [id: string]: string }>({});
+  const [chartSelectedYears, setChartSelectedYears] = useState<number>(10); // State für Chart-Jahresauswahl
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
-  // Initialisiere reinvestmentEnabled aus prognoseData beim Laden
+  // Initialisiere reinvestmentEnabled aus prognoseData beim Laden und bei Änderungen
   useEffect(() => {
     const initialReinvestment: { [id: string]: boolean } = {};
     prognoseData.investments.forEach(inv => {
-      initialReinvestment[inv.id] = inv.reinvestEnabled ?? true; // Default: true (reinvestieren)
+      // Behalte bestehende Werte bei, falls vorhanden
+      initialReinvestment[inv.id] = reinvestmentEnabled[inv.id] ?? inv.reinvestEnabled ?? true;
     });
     setReinvestmentEnabled(initialReinvestment);
-  }, []); // Nur beim ersten Laden
+  }, [prognoseData.investments.length]); // Aktualisiere wenn Anzahl der Investments sich ändert
 
   // Toggle reinvestment for an investment
   const toggleReinvestment = (id: string) => {
@@ -113,8 +116,40 @@ export const PrognoseScreen: React.FC = () => {
   const monthlyInvestments = calculateMonthlyInvestments();
   const availableMonthly = monthlySavings - monthlyInvestments;
 
+  // Berechne maximale Dauer für wiederkehrende Investments
+  const calculateMaxDuration = (investment: Investment, amount: number): number | null => {
+    if (investment.frequency === '1x') {
+      return null; // Einmalige Investments haben keine Dauer
+    }
+
+    // Monatlichen Betrag berechnen
+    let monthlyAmount = amount;
+    if (investment.frequency === 'w') monthlyAmount = amount * 4.33;
+    if (investment.frequency === 'j') monthlyAmount = amount / 12;
+
+    // Monatlicher Überschuss nach allen anderen Investments
+    const otherMonthlyInvestments = prognoseData.investments
+      .filter(inv => inv.id !== investment.id && inv.frequency !== '1x')
+      .reduce((sum, inv) => {
+        let amt = inv.amount;
+        if (inv.frequency === 'w') amt *= 4.33;
+        if (inv.frequency === 'j') amt /= 12;
+        return sum + amt;
+      }, 0);
+
+    const monthlyOverage = monthlyAmount - (monthlySavings - otherMonthlyInvestments);
+
+    if (monthlyOverage <= 0) {
+      return null; // Unbegrenzt möglich, da genug monatlicher Überschuss
+    }
+
+    // Berechne wie lange das verfügbare Kapital reicht
+    const maxMonths = Math.floor(availableLiquid / monthlyOverage);
+    return maxMonths > 0 ? maxMonths : 0;
+  };
+
   // Validierung: Prüfe ob Investment möglich ist
-  const validateInvestment = (investment: Investment, newAmount: number): { valid: boolean; message?: string } => {
+  const validateInvestment = (investment: Investment, newAmount: number, duration?: number): { valid: boolean; message?: string } => {
     if (investment.frequency === '1x') {
       // Einmalige Investments: Prüfe gegen verfügbares liquides Vermögen
       const otherOneTimeInvestments = prognoseData.investments
@@ -126,19 +161,18 @@ export const PrognoseScreen: React.FC = () => {
       if (newAmount > maxPossible) {
         return {
           valid: false,
-          message: `Nicht genug liquides Vermögen! Verfügbar: ${maxPossible.toFixed(2)} €`
+          message: `Nicht genug liquides Vermögen! Verfügbar: ${Math.max(0, maxPossible).toFixed(2)} €`
         };
       }
     } else {
-      // Wiederkehrende Investments: Prüfe gegen monatlichen Überschuss
+      // Wiederkehrende Investments: Prüfe gegen monatlichen Überschuss + verfügbares Kapital
       let monthlyAmount = newAmount;
       if (investment.frequency === 'w') monthlyAmount = newAmount * 4.33;
       if (investment.frequency === 'j') monthlyAmount = newAmount / 12;
 
       const otherMonthlyInvestments = prognoseData.investments
-        .filter(inv => inv.id !== investment.id)
+        .filter(inv => inv.id !== investment.id && inv.frequency !== '1x')
         .reduce((sum, inv) => {
-          if (inv.frequency === '1x') return sum;
           let amt = inv.amount;
           if (inv.frequency === 'w') amt *= 4.33;
           if (inv.frequency === 'j') amt /= 12;
@@ -146,12 +180,19 @@ export const PrognoseScreen: React.FC = () => {
         }, 0);
 
       const maxPossibleMonthly = monthlySavings - otherMonthlyInvestments;
+      const monthlyOverage = monthlyAmount - maxPossibleMonthly;
 
-      if (monthlyAmount > maxPossibleMonthly) {
-        return {
-          valid: false,
-          message: `Nicht genug monatlicher Überschuss! Verfügbar: ${maxPossibleMonthly.toFixed(2)} €/Monat`
-        };
+      // Wenn mehr als monatlicher Überschuss: Prüfe ob genug Kapital für Dauer vorhanden
+      if (monthlyOverage > 0) {
+        const maxDuration = calculateMaxDuration(investment, newAmount);
+        const requestedDuration = duration || investment.durationMonths || prognoseData.yearsToProject * 12;
+
+        if (maxDuration !== null && requestedDuration > maxDuration) {
+          return {
+            valid: false,
+            message: `Nicht genug Kapital für ${requestedDuration} Monate! Maximal möglich: ${maxDuration} Monate`
+          };
+        }
       }
     }
 
@@ -164,7 +205,8 @@ export const PrognoseScreen: React.FC = () => {
       name: 'Tagesgeld / Zinsen', // Default
       amount: 0,
       annualReturn: 2.0, // Default rate
-      frequency: 'm' // Default to monthly
+      frequency: 'm', // Default to monthly
+      durationMonths: undefined // Unbegrenzt
     };
 
     updatePrognoseData({
@@ -178,7 +220,7 @@ export const PrognoseScreen: React.FC = () => {
     if (field === 'amount') {
       const investment = prognoseData.investments.find(inv => inv.id === id);
       if (investment) {
-        const validation = validateInvestment(investment, value);
+        const validation = validateInvestment(investment, value, investment.durationMonths);
 
         if (!validation.valid && validation.message) {
           // Fehler anzeigen
@@ -199,6 +241,30 @@ export const PrognoseScreen: React.FC = () => {
       ...prognoseData,
       investments: prognoseData.investments.map((inv) =>
         inv.id === id ? { ...inv, [field]: value } : inv
+      )
+    });
+  };
+
+  const handleUpdateDuration = (id: string, durationMonths: number | undefined) => {
+    const investment = prognoseData.investments.find(inv => inv.id === id);
+    if (investment) {
+      const validation = validateInvestment(investment, investment.amount, durationMonths);
+
+      if (!validation.valid && validation.message) {
+        setValidationErrors(prev => ({ ...prev, [id]: validation.message! }));
+      } else {
+        setValidationErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[id];
+          return newErrors;
+        });
+      }
+    }
+
+    updatePrognoseData({
+      ...prognoseData,
+      investments: prognoseData.investments.map((inv) =>
+        inv.id === id ? { ...inv, durationMonths } : inv
       )
     });
   };
@@ -365,6 +431,28 @@ export const PrognoseScreen: React.FC = () => {
 
   const returns = calculateReturns();
 
+  // Determine oak tree stage and health based on Realrendite
+  const getOakStage = (): { stage: 1 | 2 | 3 | 4 | 'squirrel', isHealthy: boolean } => {
+    // Use realReturnRate from year1: <1% = sick oak, <=0% = squirrel
+    const realReturnRate = returns.year1.realReturnRate;
+
+    // Show squirrel if real return <= 0%
+    if (realReturnRate <= 0) {
+      return { stage: 'squirrel', isHealthy: false };
+    }
+
+    // Show sick oak if real return < 1%
+    const isHealthy = realReturnRate >= 1.0;
+
+    // Determine stage based on CHART-selected years (not prognoseData.yearsToProject)
+    if (chartSelectedYears === 1) return { stage: 1, isHealthy };
+    if (chartSelectedYears === 5) return { stage: 2, isHealthy };
+    if (chartSelectedYears === 10) return { stage: 3, isHealthy };
+    return { stage: 4, isHealthy }; // 15 Jahre
+  };
+
+  const oakInfo = getOakStage();
+
   // Determine color for real return (red to green)
   const getRealReturnColor = (value: number): string => {
     if (value < -1000) return financeColors.expenseAccent; // Pink/Magenta
@@ -384,15 +472,23 @@ export const PrognoseScreen: React.FC = () => {
 
     // Track each investment separately with reinvestment logic
     const investmentAmounts: { [id: string]: number } = {};
+    // Track months elapsed for duration tracking
+    const investmentMonthsElapsed: { [id: string]: number } = {};
+
     prognoseData.investments.forEach(inv => {
-      // Für einmalige Investments: voller Betrag am Anfang
-      // Für wiederkehrende: 0 am Anfang (wird monatlich/jährlich eingezahlt)
-      investmentAmounts[inv.id] = inv.frequency === '1x' ? inv.amount : 0;
+      // Für einmalige Investments: voller Betrag am Anfang (sofort abziehen)
+      if (inv.frequency === '1x') {
+        investmentAmounts[inv.id] = inv.amount;
+        currentLiquid -= inv.amount; // Abzug vom liquiden Vermögen
+      } else {
+        investmentAmounts[inv.id] = 0;
+        investmentMonthsElapsed[inv.id] = 0;
+      }
     });
 
     // Jahr 0 (aktuell)
     years.push(0);
-    liquidValues.push(currentLiquid);
+    liquidValues.push(Math.max(0, currentLiquid)); // Nie negativ
     investmentValues.push(Object.values(investmentAmounts).reduce((sum, val) => sum + val, 0));
 
     // Berechnung für zukünftige Jahre
@@ -400,25 +496,43 @@ export const PrognoseScreen: React.FC = () => {
       // Add annual savings to liquid assets
       currentLiquid += annualSavings;
 
-      // Add recurring investment contributions
-      prognoseData.investments.forEach(inv => {
-        if (inv.frequency !== '1x') {
-          let yearlyContribution = 0;
-          switch (inv.frequency) {
-            case 'm': // Monatlich
-              yearlyContribution = inv.amount * 12;
-              break;
-            case 'w': // Wöchentlich
-              yearlyContribution = inv.amount * 52;
-              break;
-            case 'j': // Jährlich
-              yearlyContribution = inv.amount;
-              break;
+      // Add recurring investment contributions (monatlich prüfen)
+      for (let month = 1; month <= 12; month++) {
+        prognoseData.investments.forEach(inv => {
+          if (inv.frequency !== '1x') {
+            // Prüfe ob Dauer-Limit erreicht
+            if (inv.durationMonths && investmentMonthsElapsed[inv.id] >= inv.durationMonths) {
+              return; // Keine weiteren Einzahlungen
+            }
+
+            let monthlyContribution = 0;
+            switch (inv.frequency) {
+              case 'm': // Monatlich
+                monthlyContribution = inv.amount;
+                break;
+              case 'w': // Wöchentlich (4.33 Wochen pro Monat)
+                monthlyContribution = inv.amount * 4.33;
+                break;
+              case 'j': // Jährlich (nur im letzten Monat des Jahres)
+                monthlyContribution = month === 12 ? inv.amount : 0;
+                break;
+            }
+
+            // Prüfe ob genug liquides Vermögen vorhanden ist
+            if (currentLiquid >= monthlyContribution) {
+              investmentAmounts[inv.id] += monthlyContribution;
+              currentLiquid -= monthlyContribution;
+              investmentMonthsElapsed[inv.id]++;
+            } else {
+              // Nicht genug Kapital: Nur so viel wie verfügbar
+              const actualContribution = Math.max(0, currentLiquid);
+              investmentAmounts[inv.id] += actualContribution;
+              currentLiquid -= actualContribution;
+              investmentMonthsElapsed[inv.id]++;
+            }
           }
-          investmentAmounts[inv.id] += yearlyContribution;
-          currentLiquid -= yearlyContribution;
-        }
-      });
+        });
+      }
 
       // Calculate returns for each investment
       const returns: { [id: string]: number } = {};
@@ -436,7 +550,10 @@ export const PrognoseScreen: React.FC = () => {
         const returnAmount = returns[inv.id];
         if (!returnAmount) return;
 
-        if (reinvestmentEnabled[inv.id]) {
+        // Default: reinvestieren (true), falls nicht explizit false gesetzt
+        const shouldReinvest = reinvestmentEnabled[inv.id] ?? inv.reinvestEnabled ?? true;
+
+        if (shouldReinvest) {
           // Reinvest: return stays in the investment (already added above)
           // No action needed - compound interest automatic
         } else {
@@ -449,15 +566,24 @@ export const PrognoseScreen: React.FC = () => {
       // Apply inflation to liquid assets only
       currentLiquid *= (1 - prognoseData.inflationRate / 100);
 
+      // Sicherstellen dass Werte nie negativ sind
+      currentLiquid = Math.max(0, currentLiquid);
+
       years.push(year);
       liquidValues.push(currentLiquid);
-      investmentValues.push(Object.values(investmentAmounts).reduce((sum, val) => sum + val, 0));
+      const totalInvested = Object.values(investmentAmounts).reduce((sum, val) => sum + val, 0);
+      investmentValues.push(totalInvested);
     }
 
     return { years, liquidValues, investmentValues };
   };
 
   const { years, liquidValues, investmentValues } = calculatePrognose();
+
+  // Debug: Log investment values
+  console.log('Investment Values:', investmentValues);
+  console.log('Liquid Values:', liquidValues);
+  console.log('Years:', years);
 
   // Calculate total wealth (liquid + invested)
   const totalValues = liquidValues.map((liquid, index) => liquid + investmentValues[index]);
@@ -487,318 +613,458 @@ export const PrognoseScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       {isDesktop ? (
-        <View style={styles.desktopContainer}>
-          {/* Left Column: Vermögensprognose Chart */}
-          <View style={styles.desktopLeftColumn}>
-            {/* Vermögensprognose Chart */}
-            <Card style={[styles.card, styles.squareCard]}>
-              <Card.Content>
-                <Text style={styles.cardTitle}>Vermögensprognose</Text>
+        <View style={styles.desktopMainContainer}>
+          {/* Obere Reihe: 3 Spalten (Chart | Eiche MITTIG | Flüssiges Vermögen) */}
+          <View style={styles.desktopTopRow}>
+            {/* Links: Vermögensprognose (Chart) */}
+            <View style={styles.desktopTopLeft}>
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text style={styles.cardTitle}>Vermögensprognose</Text>
 
-                <View style={styles.overviewRow}>
-                  <Text style={styles.overviewLabel}>Jährliche Ersparnis:</Text>
-                  <Text style={[
-                    styles.overviewValue,
-                    { color: annualSavings >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
-                  ]}>
-                    {Math.round(annualSavings)} €
-                  </Text>
-                </View>
+                  <View style={styles.overviewRow}>
+                    <Text style={styles.overviewLabel}>Jährliche Ersparnis:</Text>
+                    <Text style={[
+                      styles.overviewValue,
+                      { color: annualSavings >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
+                    ]}>
+                      {Math.round(annualSavings)} €
+                    </Text>
+                  </View>
 
-                <View style={styles.overviewRow}>
-                  <Text style={styles.overviewLabel}>Aktuelles Vermögen:</Text>
-                  <Text style={styles.overviewValue}>
-                    {Math.round(prognoseData.liquidAssets +
-                      prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0)
-                    )} €
-                  </Text>
-                </View>
+                  <View style={styles.overviewRow}>
+                    <Text style={styles.overviewLabel}>Aktuelles Vermögen:</Text>
+                    <Text style={styles.overviewValue}>
+                      {Math.round(prognoseData.liquidAssets +
+                        prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0)
+                      )} €
+                    </Text>
+                  </View>
 
-                <View style={styles.overviewRow}>
-                  <Text style={styles.overviewLabel}>Vermögen in {prognoseData.yearsToProject} Jahren:</Text>
-                  <Text style={styles.overviewValue}>
-                    {Math.round(liquidValues[liquidValues.length - 1] +
-                      investmentValues[investmentValues.length - 1]
-                    )} €
-                  </Text>
-                </View>
+                  <View style={styles.overviewRow}>
+                    <Text style={styles.overviewLabel}>Vermögen in {prognoseData.yearsToProject} Jahren:</Text>
+                    <Text style={styles.overviewValue}>
+                      {Math.round(liquidValues[liquidValues.length - 1] +
+                        investmentValues[investmentValues.length - 1]
+                      )} €
+                    </Text>
+                  </View>
 
-                <WealthChart
-                  years={years}
-                  liquidValues={liquidValues}
-                  investmentValues={investmentValues}
-                  width={480}
-                  inflationRate={prognoseData.inflationRate}
-                  realReturnRate={returns.year1.realReturnRate}
-                />
-              </Card.Content>
-            </Card>
+                  <WealthChart
+                    years={years}
+                    liquidValues={liquidValues}
+                    investmentValues={investmentValues}
+                    width={380}
+                    onYearsChange={setChartSelectedYears}
+                  />
+                </Card.Content>
+              </Card>
+            </View>
+
+            {/* Mitte: Wachstumsprognose (Eiche) - IMMER MITTIG */}
+            <View style={styles.desktopTopCenter}>
+              <OakGrowthWindow
+                stage={oakInfo.stage}
+                isHealthy={oakInfo.isHealthy}
+                width={280}
+                height={400}
+              />
+            </View>
+
+            {/* Rechts: Flüssiges Vermögen */}
+            <View style={styles.desktopTopRight}>
+              <Card style={[styles.card, styles.matchedHeightCard]}>
+                <Card.Content>
+                  <Text style={styles.sectionTitle}>Flüssiges Vermögen</Text>
+
+                  <View style={styles.inputBlock}>
+                    <Text style={styles.inputLabel}>Gesamtes Startkapital:</Text>
+                    {editingField === 'liquid' ? (
+                      <TextInput
+                        style={styles.input}
+                        value={prognoseData.liquidAssets.toString()}
+                        onChangeText={(text) =>
+                          updatePrognoseData({
+                            ...prognoseData,
+                            liquidAssets: parseFloat(text) || 0
+                          })
+                        }
+                        onBlur={() => setEditingField(null)}
+                        keyboardType="decimal-pad"
+                        autoFocus
+                      />
+                    ) : (
+                      <TouchableOpacity onPress={() => setEditingField('liquid')}>
+                        <Text style={styles.inputValue}>{Math.round(prognoseData.liquidAssets)} €</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Aktuell verfügbar (nach Investments):</Text>
+                    <Text style={[
+                      styles.liquidInfoValue,
+                      { color: availableLiquid >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
+                    ]}>
+                      {Math.round(availableLiquid)} €
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Monatlicher Zuwachs aus Einkommen:</Text>
+                    <Text style={[
+                      styles.liquidInfoValue,
+                      { color: monthlySavings >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
+                    ]}>
+                      {monthlySavings >= 0 ? '+' : ''}{Math.round(monthlySavings)} € / Monat
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Verfügbar für einmalige Investments:</Text>
+                    <Text style={[
+                      styles.liquidInfoValue,
+                      { color: availableLiquid >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
+                    ]}>
+                      {Math.round(availableLiquid)} €
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Verfügbar für monatliche Sparpläne:</Text>
+                    <Text style={[
+                      styles.liquidInfoValue,
+                      { color: availableMonthly >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
+                    ]}>
+                      {Math.round(availableMonthly)} € / Monat
+                    </Text>
+                  </View>
+                </Card.Content>
+              </Card>
+            </View>
           </View>
 
-          {/* Right Column: Flüssiges + Investiertes Vermögen */}
-          <View style={styles.desktopRightColumn}>
-            {/* Spacer to push content to bottom */}
-            <View style={{ flex: 1 }} />
+          {/* Untere Reihe: 2 Spalten (Renditeübersicht | Investiertes Vermögen) */}
+          <View style={styles.desktopBottomRow}>
+            {/* Links: Renditeübersicht */}
+            <View style={styles.desktopBottomLeft}>
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text style={styles.sectionTitle}>Renditeübersicht</Text>
 
-            {/* Flüssiges Vermögen */}
-            <Card style={styles.card}>
-              <Card.Content>
-                <Text style={styles.sectionTitle}>Flüssiges Vermögen</Text>
+                  {/* Prognosezeitraum (aus Chart übernommen) und Inflation */}
+                  <View style={styles.prognoseInputRow}>
+                    <View style={styles.prognoseInputBlock}>
+                      <Text style={styles.prognoseInputLabel}>Prognosezeitraum:</Text>
+                      <Text style={styles.prognoseInputValue}>{chartSelectedYears} {chartSelectedYears === 1 ? 'Jahr' : 'Jahre'}</Text>
+                    </View>
 
-                <View style={styles.inputBlock}>
-                  <Text style={styles.inputLabel}>Gesamtes Startkapital:</Text>
-                  {editingField === 'liquid' ? (
-                    <TextInput
-                      style={styles.input}
-                      value={prognoseData.liquidAssets.toString()}
-                      onChangeText={(text) =>
-                        updatePrognoseData({
-                          ...prognoseData,
-                          liquidAssets: parseFloat(text) || 0
-                        })
-                      }
-                      onBlur={() => setEditingField(null)}
-                      keyboardType="decimal-pad"
-                      autoFocus
-                    />
-                  ) : (
-                    <TouchableOpacity onPress={() => setEditingField('liquid')}>
-                      <Text style={styles.inputValue}>{Math.round(prognoseData.liquidAssets)} €</Text>
+                    <View style={styles.prognoseInputBlock}>
+                      <Text style={styles.prognoseInputLabel}>Inflation:</Text>
+                      {editingField === 'inflation' ? (
+                        <TextInput
+                          style={styles.prognoseInput}
+                          value={prognoseData.inflationRate.toString()}
+                          onChangeText={(text) => {
+                            const cleanText = text.replace(',', '.');
+                            const value = parseFloat(cleanText);
+                            updatePrognoseData({
+                              ...prognoseData,
+                              inflationRate: isNaN(value) ? 2.0 : value
+                            });
+                          }}
+                          onBlur={() => setEditingField(null)}
+                          keyboardType="decimal-pad"
+                          autoFocus
+                        />
+                      ) : (
+                        <TouchableOpacity onPress={() => setEditingField('inflation')}>
+                          <Text style={styles.prognoseInputValue}>{prognoseData.inflationRate.toFixed(1)} %</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Jahr 1 */}
+                  <Text style={[styles.liquidInfoLabel, { marginTop: 16, marginBottom: 8, fontSize: 16, fontWeight: '600', color: financeColors.textPrimary }]}>Jahr 1</Text>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
+                    <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
+                      {Math.round(returns.year1.nominalReturn)} €
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Inflation:</Text>
+                    <Text style={[styles.liquidInfoValue, { color: financeColors.expenseAccent }]}>
+                      -{Math.round(returns.year1.inflationLoss)} €
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Realrendite:</Text>
+                    <Text style={[styles.liquidInfoValue, { color: getRealReturnColor(returns.year1.realReturn), fontWeight: '700' }]}>
+                      {Math.round(returns.year1.realReturn)} € ({returns.year1.realReturnRate.toFixed(2)}%)
+                    </Text>
+                  </View>
+
+                  {/* Gesamter Zeitraum */}
+                  <Text style={[styles.liquidInfoLabel, { marginTop: 24, marginBottom: 8, fontSize: 16, fontWeight: '600', color: financeColors.textPrimary }]}>
+                    Gesamt über {prognoseData.yearsToProject} Jahre
+                  </Text>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
+                    <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
+                      {Math.round(returns.fullPeriod.nominalReturn)} €
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Inflation:</Text>
+                    <Text style={[styles.liquidInfoValue, { color: financeColors.expenseAccent }]}>
+                      -{Math.round(returns.fullPeriod.inflationLoss)} €
+                    </Text>
+                  </View>
+
+                  <View style={styles.liquidInfoRow}>
+                    <Text style={styles.liquidInfoLabel}>Realrendite:</Text>
+                    <Text style={[styles.liquidInfoValue, { color: getRealReturnColor(returns.fullPeriod.realReturn), fontWeight: '700' }]}>
+                      {Math.round(returns.fullPeriod.realReturn)} € ({returns.fullPeriod.realReturnRate.toFixed(2)}%)
+                    </Text>
+                  </View>
+                </Card.Content>
+              </Card>
+            </View>
+
+            {/* Rechts: Investiertes Vermögen */}
+            <View style={styles.desktopBottomRight}>
+              <Card style={styles.card}>
+                <Card.Content>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Investiertes Vermögen</Text>
+                    <TouchableOpacity
+                      style={styles.addInvestmentButtonSmall}
+                      onPress={handleAddInvestment}
+                    >
+                      <Text style={styles.addInvestmentButtonTextSmall}>+</Text>
                     </TouchableOpacity>
-                  )}
-                </View>
+                  </View>
 
-                <View style={styles.liquidInfoRow}>
-                  <Text style={styles.liquidInfoLabel}>Aktuell verfügbar (nach Investments):</Text>
-                  <Text style={[
-                    styles.liquidInfoValue,
-                    { color: availableLiquid >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
-                  ]}>
-                    {Math.round(availableLiquid)} €
-                  </Text>
-                </View>
+                  {prognoseData.investments.length > 0 && (
+                    <View style={styles.investmentGrid}>
+                      {prognoseData.investments.map((investment, index) => {
+                        const annualReturn = calculateAnnualReturn(investment);
+                        const isReinvesting = reinvestmentEnabled[investment.id] || false;
 
-                <View style={styles.liquidInfoRow}>
-                  <Text style={styles.liquidInfoLabel}>Monatlicher Zuwachs aus Einkommen:</Text>
-                  <Text style={[
-                    styles.liquidInfoValue,
-                    { color: monthlySavings >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
-                  ]}>
-                    {monthlySavings >= 0 ? '+' : ''}{Math.round(monthlySavings)} € / Monat
-                  </Text>
-                </View>
-
-                <View style={styles.liquidInfoRow}>
-                  <Text style={styles.liquidInfoLabel}>Verfügbar für einmalige Investments:</Text>
-                  <Text style={[
-                    styles.liquidInfoValue,
-                    { color: availableLiquid >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
-                  ]}>
-                    {Math.round(availableLiquid)} €
-                  </Text>
-                </View>
-
-                <View style={styles.liquidInfoRow}>
-                  <Text style={styles.liquidInfoLabel}>Verfügbar für monatliche Sparpläne:</Text>
-                  <Text style={[
-                    styles.liquidInfoValue,
-                    { color: availableMonthly >= 0 ? financeColors.incomeDark : financeColors.expenseAccent }
-                  ]}>
-                    {Math.round(availableMonthly)} € / Monat
-                  </Text>
-                </View>
-              </Card.Content>
-            </Card>
-
-            {/* Investiertes Vermögen */}
-            <Card style={styles.card}>
-              <Card.Content>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Investiertes Vermögen</Text>
-                  <TouchableOpacity
-                    style={styles.addInvestmentButtonSmall}
-                    onPress={handleAddInvestment}
-                  >
-                    <Text style={styles.addInvestmentButtonTextSmall}>+</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {prognoseData.investments.length > 0 && (
-                  <View style={styles.investmentGrid}>
-                    {prognoseData.investments.map((investment, index) => {
-                      const annualReturn = calculateAnnualReturn(investment);
-                      const isReinvesting = reinvestmentEnabled[investment.id] || false;
-
-                      return (
-                        <View
-                          key={investment.id}
-                          style={styles.investmentCard}
-                        >
-                          {/* Simple card content */}
-                          <View style={styles.cardInner}>
-                            <View style={styles.investmentHeader}>
-                              <Menu
-                                visible={nameMenuVisible[investment.id] || false}
-                                onDismiss={() => setNameMenuVisible(prev => ({ ...prev, [investment.id]: false }))}
-                                anchor={
-                                  <TouchableOpacity
-                                    style={styles.investmentNameButton}
-                                    onPress={() => setNameMenuVisible(prev => ({ ...prev, [investment.id]: true }))}
-                                  >
-                                    <Text style={styles.investmentName}>{investment.name}</Text>
-                                    <Text style={styles.dropdownIcon}>▼</Text>
-                                  </TouchableOpacity>
-                                }
-                              >
-                                {investmentTypes.map((type, index) => (
-                                  <Menu.Item
-                                    key={index}
-                                    onPress={() => {
-                                      handleUpdateInvestmentName(investment.id, type.name, type.defaultRate);
-                                    }}
-                                    title={type.name}
-                                  />
-                                ))}
-                              </Menu>
-                              <TouchableOpacity onPress={() => handleDeleteInvestment(investment.id)}>
-                                <Text style={styles.deleteText}>×</Text>
-                              </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.investmentInputs}>
-                              <View style={styles.investmentInputBlock}>
-                                <Text style={styles.investmentInputLabel}>Betrag:</Text>
-                                {editingField === `amount-${investment.id}` ? (
-                                  <TextInput
-                                    style={styles.investmentInput}
-                                    value={investment.amount.toString()}
-                                    onChangeText={(text) =>
-                                      handleUpdateInvestment(investment.id, 'amount', parseFloat(text) || 0)
-                                    }
-                                    onBlur={() => setEditingField(null)}
-                                    keyboardType="decimal-pad"
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <TouchableOpacity onPress={() => setEditingField(`amount-${investment.id}`)}>
-                                    <Text style={styles.investmentInputValue}>
-                                      {Math.round(investment.amount)} €
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-
-                              <View style={styles.investmentInputBlock}>
-                                <Text style={styles.investmentInputLabel}>Rendite/Jahr:</Text>
-                                {editingField === `return-${investment.id}` ? (
-                                  <TextInput
-                                    style={styles.investmentInput}
-                                    value={investment.annualReturn.toString()}
-                                    onChangeText={(text) => {
-                                      const cleanText = text.replace(',', '.');
-                                      const value = parseFloat(cleanText);
-                                      handleUpdateInvestment(investment.id, 'annualReturn', isNaN(value) ? 0 : value);
-                                    }}
-                                    onBlur={() => setEditingField(null)}
-                                    keyboardType="decimal-pad"
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <TouchableOpacity onPress={() => setEditingField(`return-${investment.id}`)}>
-                                    <Text style={styles.investmentInputValue}>
-                                      {investment.annualReturn.toFixed(1)} %
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            </View>
-
-                            {/* Frequency Selector */}
-                            <View style={styles.frequencyRow}>
-                              <Text style={styles.frequencyRowLabel}>Einzahlung:</Text>
-                              <Menu
-                                visible={frequencyMenuVisible[investment.id] || false}
-                                onDismiss={() => setFrequencyMenuVisible(prev => ({ ...prev, [investment.id]: false }))}
-                                anchor={
-                                  <TouchableOpacity
-                                    style={styles.frequencyButton}
-                                    onPress={() => setFrequencyMenuVisible(prev => ({ ...prev, [investment.id]: true }))}
-                                  >
-                                    <Text style={styles.frequencyButtonText}>
-                                      {investment.frequency} - {frequencyLabels[investment.frequency]}
-                                    </Text>
-                                  </TouchableOpacity>
-                                }
-                              >
-                                {(['1x', 'w', 'm', 'j'] as Frequency[]).map((freq) => (
-                                  <Menu.Item
-                                    key={freq}
-                                    onPress={() => handleUpdateFrequency(investment.id, freq)}
-                                    title={`${freq} - ${frequencyLabels[freq]}`}
-                                  />
-                                ))}
-                              </Menu>
-                            </View>
-
-                            {/* Erträge mit Reinvestment Toggle */}
-                            <View style={styles.returnRowWithToggle}>
-                              <View style={styles.returnInfo}>
-                                <Text style={styles.returnLabel}>Erträge / Jahr:</Text>
-                                <Text style={styles.returnValue}>
-                                  {Math.round(annualReturn)} €
-                                </Text>
-                              </View>
-
-                              {/* Stylischer Toggle-Switch */}
-                              <View style={styles.toggleContainer}>
-                                <Text style={styles.toggleLabel}>Reinvestieren</Text>
-                                <TouchableOpacity
-                                  style={[
-                                    styles.toggleTrack,
-                                    isReinvesting && styles.toggleTrackActive
-                                  ]}
-                                  onPress={() => toggleReinvestment(investment.id)}
+                        return (
+                          <View
+                            key={investment.id}
+                            style={styles.investmentCard}
+                          >
+                            <View style={styles.cardInner}>
+                              <View style={styles.investmentHeader}>
+                                <Menu
+                                  visible={nameMenuVisible[investment.id] || false}
+                                  onDismiss={() => setNameMenuVisible(prev => ({ ...prev, [investment.id]: false }))}
+                                  anchor={
+                                    <TouchableOpacity
+                                      style={styles.investmentNameButton}
+                                      onPress={() => setNameMenuVisible(prev => ({ ...prev, [investment.id]: true }))}
+                                    >
+                                      <Text style={styles.investmentName}>{investment.name}</Text>
+                                      <Text style={styles.dropdownIcon}>▼</Text>
+                                    </TouchableOpacity>
+                                  }
                                 >
-                                  <View
-                                    style={[
-                                      styles.toggleThumb,
-                                      isReinvesting && styles.toggleThumbActive
-                                    ]}
-                                  />
+                                  {investmentTypes.map((type, index) => (
+                                    <Menu.Item
+                                      key={index}
+                                      onPress={() => {
+                                        handleUpdateInvestmentName(investment.id, type.name, type.defaultRate);
+                                      }}
+                                      title={type.name}
+                                    />
+                                  ))}
+                                </Menu>
+                                <TouchableOpacity onPress={() => handleDeleteInvestment(investment.id)}>
+                                  <Text style={styles.deleteText}>×</Text>
                                 </TouchableOpacity>
                               </View>
+
+                              <View style={styles.investmentInputs}>
+                                <View style={styles.investmentInputBlock}>
+                                  <Text style={styles.investmentInputLabel}>Betrag:</Text>
+                                  {editingField === `amount-${investment.id}` ? (
+                                    <TextInput
+                                      style={styles.investmentInput}
+                                      value={investment.amount.toString()}
+                                      onChangeText={(text) =>
+                                        handleUpdateInvestment(investment.id, 'amount', parseFloat(text) || 0)
+                                      }
+                                      onBlur={() => setEditingField(null)}
+                                      keyboardType="decimal-pad"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <TouchableOpacity onPress={() => setEditingField(`amount-${investment.id}`)}>
+                                      <Text style={styles.investmentInputValue}>
+                                        {Math.round(investment.amount)} €
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+
+                                <View style={styles.investmentInputBlock}>
+                                  <Text style={styles.investmentInputLabel}>Rendite/Jahr:</Text>
+                                  {editingField === `return-${investment.id}` ? (
+                                    <TextInput
+                                      style={styles.investmentInput}
+                                      value={investment.annualReturn.toString()}
+                                      onChangeText={(text) => {
+                                        const cleanText = text.replace(',', '.');
+                                        const value = parseFloat(cleanText);
+                                        handleUpdateInvestment(investment.id, 'annualReturn', isNaN(value) ? 0 : value);
+                                      }}
+                                      onBlur={() => setEditingField(null)}
+                                      keyboardType="decimal-pad"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <TouchableOpacity onPress={() => setEditingField(`return-${investment.id}`)}>
+                                      <Text style={styles.investmentInputValue}>
+                                        {investment.annualReturn.toFixed(1)} %
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                              </View>
+
+                              {/* Frequency Selector */}
+                              <View style={styles.frequencyRow}>
+                                <Text style={styles.frequencyRowLabel}>Einzahlung:</Text>
+                                <Menu
+                                  visible={frequencyMenuVisible[investment.id] || false}
+                                  onDismiss={() => setFrequencyMenuVisible(prev => ({ ...prev, [investment.id]: false }))}
+                                  anchor={
+                                    <TouchableOpacity
+                                      style={styles.frequencyButton}
+                                      onPress={() => setFrequencyMenuVisible(prev => ({ ...prev, [investment.id]: true }))}
+                                    >
+                                      <Text style={styles.frequencyButtonText}>
+                                        {investment.frequency} - {frequencyLabels[investment.frequency]}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  }
+                                >
+                                  {(['1x', 'w', 'm', 'j'] as Frequency[]).map((freq) => (
+                                    <Menu.Item
+                                      key={freq}
+                                      onPress={() => handleUpdateFrequency(investment.id, freq)}
+                                      title={`${freq} - ${frequencyLabels[freq]}`}
+                                    />
+                                  ))}
+                                </Menu>
+                              </View>
+
+                              {/* Dauer der Einzahlungen (nur für wiederkehrende Investments) */}
+                              {investment.frequency !== '1x' && (
+                                <View style={styles.durationRow}>
+                                  <Text style={styles.durationLabel}>
+                                    Dauer:
+                                  </Text>
+                                  {editingField === `duration-${investment.id}` ? (
+                                    <TextInput
+                                      style={styles.durationInput}
+                                      value={investment.durationMonths?.toString() || ''}
+                                      placeholder="Unbegrenzt"
+                                      onChangeText={(text) => {
+                                        const value = text === '' ? undefined : parseInt(text);
+                                        handleUpdateDuration(investment.id, value);
+                                      }}
+                                      onBlur={() => setEditingField(null)}
+                                      keyboardType="number-pad"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <TouchableOpacity onPress={() => setEditingField(`duration-${investment.id}`)}>
+                                      <Text style={styles.durationValue}>
+                                        {investment.durationMonths ? `${investment.durationMonths} Mon.` : 'Unbegrenzt'}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                              )}
+
+                              {/* Erträge mit Reinvestment Toggle */}
+                              <View style={styles.returnRowWithToggle}>
+                                <View style={styles.returnInfo}>
+                                  <Text style={styles.returnLabel}>Erträge / Jahr:</Text>
+                                  <Text style={styles.returnValue}>
+                                    {Math.round(annualReturn)} €
+                                  </Text>
+                                </View>
+
+                                {/* Stylischer Toggle-Switch */}
+                                <View style={styles.toggleContainer}>
+                                  <Text style={styles.toggleLabel}>Reinvestieren</Text>
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.toggleTrack,
+                                      isReinvesting && styles.toggleTrackActive
+                                    ]}
+                                    onPress={() => toggleReinvestment(investment.id)}
+                                  >
+                                    <View
+                                      style={[
+                                        styles.toggleThumb,
+                                        isReinvesting && styles.toggleThumbActive
+                                      ]}
+                                    />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+
+                              {/* Status-Text */}
+                              {isReinvesting && (
+                                <View style={styles.reinvestStatus}>
+                                  <Text style={styles.reinvestStatusText}>
+                                    ✓ Wird reinvestiert
+                                  </Text>
+                                </View>
+                              )}
+
+                              {/* Validierungs-Warnung */}
+                              {validationErrors[investment.id] && (
+                                <View style={styles.validationError}>
+                                  <Text style={styles.validationErrorText}>
+                                    ⚠ {validationErrors[investment.id]}
+                                  </Text>
+                                </View>
+                              )}
                             </View>
-
-                            {/* Status-Text */}
-                            {isReinvesting && (
-                              <View style={styles.reinvestStatus}>
-                                <Text style={styles.reinvestStatusText}>
-                                  ✓ Wird reinvestiert
-                                </Text>
-                              </View>
-                            )}
-
-                            {/* Validierungs-Warnung */}
-                            {validationErrors[investment.id] && (
-                              <View style={styles.validationError}>
-                                <Text style={styles.validationErrorText}>
-                                  ⚠ {validationErrors[investment.id]}
-                                </Text>
-                              </View>
-                            )}
                           </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </Card.Content>
-            </Card>
+                        );
+                      })}
+                    </View>
+                  )}
+                </Card.Content>
+              </Card>
+            </View>
           </View>
         </View>
       ) : (
-        // Mobile Layout: Alles untereinander
         <>
+          {/* Mobile: Oak Growth Window oben mittig */}
+          <OakGrowthWindow
+            stage={oakInfo.stage}
+            isHealthy={oakInfo.isHealthy}
+            width={300}
+            height={320}
+          />
+
+          {/* Mobile Layout: Alles untereinander */}
           {/* Prognosezeitraum und Inflation Card */}
           <Card style={styles.card}>
             <Card.Content>
@@ -890,8 +1156,7 @@ export const PrognoseScreen: React.FC = () => {
                 liquidValues={liquidValues}
                 investmentValues={investmentValues}
                 width={Dimensions.get('window').width - 80}
-                inflationRate={prognoseData.inflationRate}
-                realReturnRate={returns.year1.realReturnRate}
+                onYearsChange={setChartSelectedYears}
               />
             </Card.Content>
           </Card>
@@ -1089,6 +1354,35 @@ export const PrognoseScreen: React.FC = () => {
                       </Menu>
                     </View>
 
+                    {/* Dauer der Einzahlungen (nur für wiederkehrende Investments) */}
+                    {investment.frequency !== '1x' && (
+                      <View style={styles.durationRow}>
+                        <Text style={styles.durationLabel}>
+                          Dauer:
+                        </Text>
+                        {editingField === `duration-${investment.id}` ? (
+                          <TextInput
+                            style={styles.durationInput}
+                            value={investment.durationMonths?.toString() || ''}
+                            placeholder="Unbegrenzt"
+                            onChangeText={(text) => {
+                              const value = text === '' ? undefined : parseInt(text);
+                              handleUpdateDuration(investment.id, value);
+                            }}
+                            onBlur={() => setEditingField(null)}
+                            keyboardType="number-pad"
+                            autoFocus
+                          />
+                        ) : (
+                          <TouchableOpacity onPress={() => setEditingField(`duration-${investment.id}`)}>
+                            <Text style={styles.durationValue}>
+                              {investment.durationMonths ? `${investment.durationMonths} Mon.` : 'Unbegrenzt'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
                     {/* Erträge mit Reinvestment Toggle */}
                     <View style={styles.returnRowWithToggle}>
                       <View style={styles.returnInfo}>
@@ -1140,37 +1434,17 @@ export const PrognoseScreen: React.FC = () => {
               })}
             </Card.Content>
           </Card>
-        </>
-      )}
 
-      {/* Nominal- und Realrendite Section - Bar Chart */}
-      <Card style={styles.card}>
+          {/* Rendite-Übersicht für Mobile */}
+          <Card style={styles.card}>
         <Card.Content>
           <Text style={styles.sectionTitle}>Rendite-Übersicht</Text>
 
-          {/* Prognosezeitraum und Inflation */}
+          {/* Prognosezeitraum (aus Chart übernommen) und Inflation */}
           <View style={styles.prognoseInputRow}>
             <View style={styles.prognoseInputBlock}>
               <Text style={styles.prognoseInputLabel}>Prognosezeitraum:</Text>
-              {editingField === 'years' ? (
-                <TextInput
-                  style={styles.prognoseInput}
-                  value={prognoseData.yearsToProject.toString()}
-                  onChangeText={(text) =>
-                    updatePrognoseData({
-                      ...prognoseData,
-                      yearsToProject: parseInt(text) || 10
-                    })
-                  }
-                  onBlur={() => setEditingField(null)}
-                  keyboardType="number-pad"
-                  autoFocus
-                />
-              ) : (
-                <TouchableOpacity onPress={() => setEditingField('years')}>
-                  <Text style={styles.prognoseInputValue}>{prognoseData.yearsToProject} Jahre</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={styles.prognoseInputValue}>{chartSelectedYears} {chartSelectedYears === 1 ? 'Jahr' : 'Jahre'}</Text>
             </View>
 
             <View style={styles.prognoseInputBlock}>
@@ -1199,123 +1473,59 @@ export const PrognoseScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Jahr 1 Bar Chart */}
-          <View style={styles.barChartContainer}>
-            <Text style={styles.barChartLabel}>Jahr 1</Text>
+          {/* Jahr 1 */}
+          <Text style={[styles.liquidInfoLabel, { marginTop: 16, marginBottom: 8, fontSize: 16, fontWeight: '600', color: financeColors.textPrimary }]}>Jahr 1</Text>
 
-            {/* Nominalrendite Bar */}
-            <View style={styles.barRow}>
-              <Text style={styles.barLabelText}>Nominalrendite</Text>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.min(Math.abs(returns.year1.nominalReturn) / 100, 100)}%`,
-                      backgroundColor: financeColors.incomeDark
-                    }
-                  ]}
-                />
-                <Text style={styles.barValueText}>{Math.round(returns.year1.nominalReturn)} €</Text>
-              </View>
-            </View>
-
-            {/* Inflation Bar */}
-            <View style={styles.barRow}>
-              <Text style={styles.barLabelText}>Inflation</Text>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.min(Math.abs(returns.year1.inflationLoss) / 100, 100)}%`,
-                      backgroundColor: financeColors.expenseAccent
-                    }
-                  ]}
-                />
-                <Text style={styles.barValueText}>-{Math.round(returns.year1.inflationLoss)} €</Text>
-              </View>
-            </View>
-
-            {/* Realrendite Bar */}
-            <View style={styles.barRow}>
-              <Text style={[styles.barLabelText, { fontWeight: 'bold' }]}>Realrendite</Text>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.min(Math.abs(returns.year1.realReturn) / 100, 100)}%`,
-                      backgroundColor: getRealReturnColor(returns.year1.realReturn)
-                    }
-                  ]}
-                />
-                <Text style={[styles.barValueText, { fontWeight: 'bold' }]}>
-                  {Math.round(returns.year1.realReturn)} € ({returns.year1.realReturnRate.toFixed(2)}%)
-                </Text>
-              </View>
-            </View>
+          <View style={styles.liquidInfoRow}>
+            <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
+            <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
+              {Math.round(returns.year1.nominalReturn)} €
+            </Text>
           </View>
 
-          {/* Gesamter Zeitraum Bar Chart */}
-          <View style={[styles.barChartContainer, { marginTop: 24 }]}>
-            <Text style={styles.barChartLabel}>Gesamt über {prognoseData.yearsToProject} Jahre</Text>
+          <View style={styles.liquidInfoRow}>
+            <Text style={styles.liquidInfoLabel}>Inflation:</Text>
+            <Text style={[styles.liquidInfoValue, { color: financeColors.expenseAccent }]}>
+              -{Math.round(returns.year1.inflationLoss)} €
+            </Text>
+          </View>
 
-            {/* Nominalrendite Bar */}
-            <View style={styles.barRow}>
-              <Text style={styles.barLabelText}>Nominalrendite</Text>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.min(Math.abs(returns.fullPeriod.nominalReturn) / 1000, 100)}%`,
-                      backgroundColor: financeColors.incomeDark
-                    }
-                  ]}
-                />
-                <Text style={styles.barValueText}>{Math.round(returns.fullPeriod.nominalReturn)} €</Text>
-              </View>
-            </View>
+          <View style={styles.liquidInfoRow}>
+            <Text style={styles.liquidInfoLabel}>Realrendite:</Text>
+            <Text style={[styles.liquidInfoValue, { color: getRealReturnColor(returns.year1.realReturn), fontWeight: '700' }]}>
+              {Math.round(returns.year1.realReturn)} € ({returns.year1.realReturnRate.toFixed(2)}%)
+            </Text>
+          </View>
 
-            {/* Inflation Bar */}
-            <View style={styles.barRow}>
-              <Text style={styles.barLabelText}>Inflation</Text>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.min(Math.abs(returns.fullPeriod.inflationLoss) / 1000, 100)}%`,
-                      backgroundColor: financeColors.expenseAccent
-                    }
-                  ]}
-                />
-                <Text style={styles.barValueText}>-{Math.round(returns.fullPeriod.inflationLoss)} €</Text>
-              </View>
-            </View>
+          {/* Gesamter Zeitraum */}
+          <Text style={[styles.liquidInfoLabel, { marginTop: 24, marginBottom: 8, fontSize: 16, fontWeight: '600', color: financeColors.textPrimary }]}>
+            Gesamt über {prognoseData.yearsToProject} Jahre
+          </Text>
 
-            {/* Realrendite Bar */}
-            <View style={styles.barRow}>
-              <Text style={[styles.barLabelText, { fontWeight: 'bold' }]}>Realrendite</Text>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.min(Math.abs(returns.fullPeriod.realReturn) / 1000, 100)}%`,
-                      backgroundColor: getRealReturnColor(returns.fullPeriod.realReturn)
-                    }
-                  ]}
-                />
-                <Text style={[styles.barValueText, { fontWeight: 'bold' }]}>
-                  {Math.round(returns.fullPeriod.realReturn)} € ({returns.fullPeriod.realReturnRate.toFixed(2)}%)
-                </Text>
-              </View>
-            </View>
+          <View style={styles.liquidInfoRow}>
+            <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
+            <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
+              {Math.round(returns.fullPeriod.nominalReturn)} €
+            </Text>
+          </View>
+
+          <View style={styles.liquidInfoRow}>
+            <Text style={styles.liquidInfoLabel}>Inflation:</Text>
+            <Text style={[styles.liquidInfoValue, { color: financeColors.expenseAccent }]}>
+              -{Math.round(returns.fullPeriod.inflationLoss)} €
+            </Text>
+          </View>
+
+          <View style={styles.liquidInfoRow}>
+            <Text style={styles.liquidInfoLabel}>Realrendite:</Text>
+            <Text style={[styles.liquidInfoValue, { color: getRealReturnColor(returns.fullPeriod.realReturn), fontWeight: '700' }]}>
+              {Math.round(returns.fullPeriod.realReturn)} € ({returns.fullPeriod.realReturnRate.toFixed(2)}%)
+            </Text>
           </View>
         </Card.Content>
       </Card>
+      </>
+      )}
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -1327,22 +1537,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: financeColors.background
   },
-  desktopContainer: {
-    flexDirection: 'row',
-    gap: 16,
+  desktopMainContainer: {
     paddingHorizontal: 16,
     paddingTop: 16
   },
-  desktopLeftColumn: {
+  desktopTopRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+    alignItems: 'flex-start'
+  },
+  desktopTopLeft: {
     flex: 1,
     minWidth: 0
   },
-  desktopRightColumn: {
+  desktopTopCenter: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start'
+  },
+  desktopTopRight: {
     flex: 1,
     minWidth: 0
   },
-  squareCard: {
-    minHeight: 500
+  desktopBottomRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+    alignItems: 'flex-start'
+  },
+  desktopBottomLeft: {
+    flex: 1,
+    minWidth: 0
+  },
+  desktopBottomRight: {
+    flex: 2,
+    minWidth: 0
   },
   card: {
     margin: 16,
@@ -1354,6 +1585,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8
+  },
+  matchedHeightCard: {
+    minHeight: 400
   },
   cardDropTarget: {
     borderWidth: 3,
@@ -1917,6 +2151,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: financeColors.textPrimary,
     fontWeight: '600'
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: financeColors.divider
+  },
+  durationLabel: {
+    fontSize: 12,
+    color: financeColors.textSecondary,
+    fontWeight: '500',
+    flex: 1
+  },
+  durationInput: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: financeColors.textPrimary,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: financeColors.incomeDark,
+    minWidth: 80,
+    textAlign: 'center'
+  },
+  durationValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: financeColors.textPrimary,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    textAlign: 'center'
   },
   bottomPadding: {
     height: 40
