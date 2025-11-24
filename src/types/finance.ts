@@ -40,6 +40,8 @@ export interface Investment {
   frequency: Frequency; // Wie oft wird investiert
   reinvestEnabled?: boolean; // Ob Erträge reinvestiert werden (optional für Rückwärtskompatibilität)
   durationMonths?: number; // Dauer der Einzahlungen in Monaten (null = unbegrenzt, nur für wiederkehrende Investments)
+  amountType?: 'euro' | 'percentage'; // Art der Eingabe
+  percentageAmount?: number; // Prozentsatz vom verfügbaren Vermögen
 }
 
 export interface PrognoseData {

@@ -1,0 +1,6 @@
+1.Es gibt einen bug im Fenster "Flüssiges Vermögen" unter "akutell Verfügbar nach investment" dort wird trotz investmentments der Gesamt zuwachs aus Einkommen angezeigt. 
+2. Das Menü unten ist nun zentriert aber zu nah zusammengerückt. Bitte ordne es so an das es immer so angeordnet ist wie die Position auf Seite 1 oben die Reiter Einnahmen, Erparnis und Ausgaben.
+3.der donate Button fehlt. Füge die Datei die ich dir eben angegeben habe rechts oben neben liquidi, aber im rechten Eck der Webseite ein, Färbe den button grau und füge den Text "Donate" ein mit der verlinkten Donation seite. Scaliere den Button auf die Höhe des liquidi Logo in Z.
+4. Im Feld Investiertes Vermögen GEHT die PRozenteingabe IMMERNOCH nicht. das kann doch nicht unmöglich sein ein Kommabetrag einzugeben mit nur EINER Nachkommastelle. Bei Rendite und Inflation! Er zeigt mir zwar eine Kommazahl an, ich kann aber ncith selber 1.5% eingeben!
+Bitte ordne die beiden Felder aus so an, das die Auswahl "Euro oder %" direkt hinter dem Eingabefeld steht in gleicher grösse und in Weiss. 
+

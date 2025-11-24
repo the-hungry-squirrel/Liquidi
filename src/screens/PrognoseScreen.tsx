@@ -37,6 +37,7 @@ export const PrognoseScreen: React.FC = () => {
   } = useFinance();
 
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
   const [reinvestmentEnabled, setReinvestmentEnabled] = useState<{ [id: string]: boolean }>({});
   const [frequencyMenuVisible, setFrequencyMenuVisible] = useState<{ [id: string]: boolean }>({});
   const [nameMenuVisible, setNameMenuVisible] = useState<{ [id: string]: boolean }>({});
@@ -79,8 +80,8 @@ export const PrognoseScreen: React.FC = () => {
 
   // Berechne das tatsächlich verfügbare liquide Vermögen
   const calculateAvailableLiquid = (): number => {
-    // Startvermögen (Extravermögen + currentAssets)
-    const startingLiquid = prognoseData.currentAssets + prognoseData.liquidAssets;
+    // Startvermögen
+    const startingLiquid = prognoseData.liquidAssets;
 
     // Abzug: Alle bereits getätigten Investments (einmalige)
     const oneTimeInvestments = prognoseData.investments
@@ -199,6 +200,38 @@ export const PrognoseScreen: React.FC = () => {
     return { valid: true };
   };
 
+  // Berechne Gesamtprozentsatz aller Investments
+  const calculateTotalPercentage = (excludeId?: string): number => {
+    return prognoseData.investments
+      .filter(inv => inv.id !== excludeId)
+      .reduce((sum, inv) => {
+        // Berechne Prozentsatz basierend auf amountType
+        if (inv.amountType === 'percentage' && inv.percentageAmount) {
+          return sum + inv.percentageAmount;
+        } else {
+          // Konvertiere Euro in Prozent
+          const percentage = (inv.amount / availableLiquid) * 100;
+          return sum + percentage;
+        }
+      }, 0);
+  };
+
+  // Validiere dass Prozentsatz max 100% ist
+  const validatePercentageLimit = (investmentId: string, newPercentage: number): { valid: boolean; message?: string } => {
+    const otherPercentages = calculateTotalPercentage(investmentId);
+    const total = otherPercentages + newPercentage;
+
+    if (total > 100) {
+      const available = 100 - otherPercentages;
+      return {
+        valid: false,
+        message: `Maximal ${available.toFixed(1)}% verfügbar! (Gesamt: ${total.toFixed(1)}%)`
+      };
+    }
+
+    return { valid: true };
+  };
+
   const handleAddInvestment = () => {
     const newInvestment: Investment = {
       id: Date.now().toString(),
@@ -215,12 +248,12 @@ export const PrognoseScreen: React.FC = () => {
     });
   };
 
-  const handleUpdateInvestment = (id: string, field: 'amount' | 'annualReturn', value: number) => {
+  const handleUpdateInvestment = (id: string, field: 'amount' | 'annualReturn' | 'amountType' | 'percentageAmount', value: number | string) => {
     // Nur bei Amount-Änderungen validieren
     if (field === 'amount') {
       const investment = prognoseData.investments.find(inv => inv.id === id);
       if (investment) {
-        const validation = validateInvestment(investment, value, investment.durationMonths);
+        const validation = validateInvestment(investment, value as number, investment.durationMonths);
 
         if (!validation.valid && validation.message) {
           // Fehler anzeigen
@@ -330,8 +363,10 @@ export const PrognoseScreen: React.FC = () => {
       year1NominalReturn += calculateAnnualReturn(inv);
     });
 
-    // Inflation loss only on liquid assets (not on investments, as returns compensate)
-    const year1InflationLoss = prognoseData.liquidAssets * (prognoseData.inflationRate / 100);
+    // Inflation loss on TOTAL WEALTH (liquid + invested)
+    const totalInvestedYear1 = prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalWealthYear1 = prognoseData.liquidAssets + totalInvestedYear1;
+    const year1InflationLoss = totalWealthYear1 * (prognoseData.inflationRate / 100);
     const year1RealReturn = year1NominalReturn - year1InflationLoss;
 
     // Full period calculation (with reinvestment and recurring contributions)
@@ -393,11 +428,18 @@ export const PrognoseScreen: React.FC = () => {
         }
       });
 
-      // Calculate inflation loss only on liquid assets (investments already compensate via returns)
-      const yearlyInflationLoss = currentLiquid * (prognoseData.inflationRate / 100);
+      // Calculate inflation loss on TOTAL WEALTH (liquid + invested)
+      const totalInvestedThisYear = Object.values(investmentAmounts).reduce((sum, val) => sum + val, 0);
+      const totalWealthThisYear = currentLiquid + totalInvestedThisYear;
+      const yearlyInflationLoss = totalWealthThisYear * (prognoseData.inflationRate / 100);
 
-      // Apply inflation only to liquid assets
+      // Apply inflation to liquid assets
       currentLiquid *= (1 - prognoseData.inflationRate / 100);
+
+      // Apply inflation to invested assets
+      prognoseData.investments.forEach(inv => {
+        investmentAmounts[inv.id] *= (1 - prognoseData.inflationRate / 100);
+      });
 
       totalNominalReturnSum += yearlyNominalReturn;
       totalInflationLossSum += yearlyInflationLoss;
@@ -408,20 +450,21 @@ export const PrognoseScreen: React.FC = () => {
     const totalPeriodInflationLoss = totalInflationLossSum;
     const totalPeriodRealReturn = totalPeriodNominalReturn - totalPeriodInflationLoss;
 
-    // Calculate average annual return rate
-    const totalInvestedYear1 = prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0);
-    const avgYear1ReturnRate = totalInvestedYear1 > 0 ? (year1NominalReturn / totalInvestedYear1) * 100 : 0;
-    const realReturnRateYear1 = avgYear1ReturnRate - prognoseData.inflationRate;
+    // Calculate average annual return rate on total wealth
+    const avgYear1ReturnRate = totalWealthYear1 > 0 ? (year1NominalReturn / totalWealthYear1) * 100 : 0;
+    const realReturnRateYear1 = totalWealthYear1 > 0 ? (year1RealReturn / totalWealthYear1) * 100 : 0;
 
     return {
       year1: {
         nominalReturn: year1NominalReturn,
+        nominalReturnRate: avgYear1ReturnRate,
         inflationLoss: year1InflationLoss,
         realReturn: year1RealReturn,
         realReturnRate: realReturnRateYear1
       },
       fullPeriod: {
         nominalReturn: totalPeriodNominalReturn,
+        nominalReturnRate: avgYear1ReturnRate,
         inflationLoss: totalPeriodInflationLoss,
         realReturn: totalPeriodRealReturn,
         realReturnRate: realReturnRateYear1 // Verwende die gleiche Rate für Konsistenz
@@ -431,18 +474,30 @@ export const PrognoseScreen: React.FC = () => {
 
   const returns = calculateReturns();
 
-  // Determine oak tree stage and health based on Realrendite
+  // Determine oak tree stage and health based on growth type and return rate
   const getOakStage = (): { stage: 1 | 2 | 3 | 4 | 'squirrel', isHealthy: boolean } => {
-    // Use realReturnRate from year1: <1% = sick oak, <=0% = squirrel
-    const realReturnRate = returns.year1.realReturnRate;
+    // Berechne Rendite auf GESAMTVERMÖGEN (nicht nur Investments)
+    const totalWealth = prognoseData.liquidAssets +
+      prognoseData.investments.reduce((sum, inv) => sum + inv.amount, 0);
 
-    // Show squirrel if real return <= 0%
-    if (realReturnRate <= 0) {
+    // Rendite auf Gesamtvermögen in Prozent
+    const returnOnTotalWealth = totalWealth > 0
+      ? (returns.year1.nominalReturn / totalWealth) * 100
+      : 0;
+
+    // Prüfe ob Wachstum exponentiell ist (mindestens ein Investment mit Reinvestment)
+    const hasExponentialGrowth = prognoseData.investments.some(inv =>
+      reinvestmentEnabled[inv.id] !== false
+    );
+
+    // Kranke Eichen: Lineares Wachstum ODER Rendite < 2.5%
+    // Gesunde Eichen: Exponentielles Wachstum UND Rendite >= 2.5%
+    const isHealthy = hasExponentialGrowth && returnOnTotalWealth >= 2.5;
+
+    // Squirrel: Wenn Realrendite <= 0% (Verlust)
+    if (returns.year1.realReturn <= 0) {
       return { stage: 'squirrel', isHealthy: false };
     }
-
-    // Show sick oak if real return < 1%
-    const isHealthy = realReturnRate >= 1.0;
 
     // Determine stage based on CHART-selected years (not prognoseData.yearsToProject)
     if (chartSelectedYears === 1) return { stage: 1, isHealthy };
@@ -690,7 +745,7 @@ export const PrognoseScreen: React.FC = () => {
                           })
                         }
                         onBlur={() => setEditingField(null)}
-                        keyboardType="decimal-pad"
+                        keyboardType="numeric"
                         autoFocus
                       />
                     ) : (
@@ -764,21 +819,39 @@ export const PrognoseScreen: React.FC = () => {
                       {editingField === 'inflation' ? (
                         <TextInput
                           style={styles.prognoseInput}
-                          value={prognoseData.inflationRate.toString()}
+                          value={editingValue}
                           onChangeText={(text) => {
-                            const cleanText = text.replace(',', '.');
-                            const value = parseFloat(cleanText);
-                            updatePrognoseData({
-                              ...prognoseData,
-                              inflationRate: isNaN(value) ? 2.0 : value
-                            });
+                            // Erlaube Zahlen, Punkt und Komma
+                            let cleanText = text.replace(',', '.');
+                            cleanText = cleanText.replace(/[^0-9.]/g, '');
+                            const dotCount = (cleanText.match(/\./g) || []).length;
+                            if (dotCount > 1) {
+                              const parts = cleanText.split('.');
+                              cleanText = parts[0] + '.' + parts.slice(1).join('');
+                            }
+                            setEditingValue(cleanText);
                           }}
-                          onBlur={() => setEditingField(null)}
-                          keyboardType="decimal-pad"
+                          onBlur={() => {
+                            const value = parseFloat(editingValue);
+                            if (!isNaN(value) && value >= 0) {
+                              updatePrognoseData({
+                                ...prognoseData,
+                                inflationRate: value
+                              });
+                            }
+                            setEditingField(null);
+                            setEditingValue('');
+                          }}
+                          keyboardType="default"
                           autoFocus
                         />
                       ) : (
-                        <TouchableOpacity onPress={() => setEditingField('inflation')}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditingValue(prognoseData.inflationRate.toString());
+                            setEditingField('inflation');
+                          }}
+                        >
                           <Text style={styles.prognoseInputValue}>{prognoseData.inflationRate.toFixed(1)} %</Text>
                         </TouchableOpacity>
                       )}
@@ -791,7 +864,7 @@ export const PrognoseScreen: React.FC = () => {
                   <View style={styles.liquidInfoRow}>
                     <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
                     <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
-                      {Math.round(returns.year1.nominalReturn)} €
+                      {Math.round(returns.year1.nominalReturn)} € ({returns.year1.nominalReturnRate.toFixed(2)}%)
                     </Text>
                   </View>
 
@@ -817,7 +890,7 @@ export const PrognoseScreen: React.FC = () => {
                   <View style={styles.liquidInfoRow}>
                     <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
                     <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
-                      {Math.round(returns.fullPeriod.nominalReturn)} €
+                      {Math.round(returns.fullPeriod.nominalReturn)} € ({returns.fullPeriod.nominalReturnRate.toFixed(2)}%)
                     </Text>
                   </View>
 
@@ -894,50 +967,161 @@ export const PrognoseScreen: React.FC = () => {
                               </View>
 
                               <View style={styles.investmentInputs}>
-                                <View style={styles.investmentInputBlock}>
-                                  <Text style={styles.investmentInputLabel}>Betrag:</Text>
-                                  {editingField === `amount-${investment.id}` ? (
-                                    <TextInput
-                                      style={styles.investmentInput}
-                                      value={investment.amount.toString()}
-                                      onChangeText={(text) =>
-                                        handleUpdateInvestment(investment.id, 'amount', parseFloat(text) || 0)
-                                      }
-                                      onBlur={() => setEditingField(null)}
-                                      keyboardType="decimal-pad"
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    <TouchableOpacity onPress={() => setEditingField(`amount-${investment.id}`)}>
-                                      <Text style={styles.investmentInputValue}>
-                                        {Math.round(investment.amount)} €
+                                <View style={[styles.investmentInputBlock, styles.amountInputBlockGreen]}>
+                                  <Text style={styles.investmentInputLabel}>
+                                    {(investment.amountType || 'euro') === 'euro'
+                                      ? 'Betrag:'
+                                      : 'Betrag des verfügbaren Vermögens:'}
+                                  </Text>
+                                  <View style={styles.inputWithToggleRow}>
+                                    {editingField === `amount-${investment.id}` ? (
+                                      <TextInput
+                                        style={styles.investmentInputInline}
+                                        value={editingValue}
+                                        onChangeText={(text) => {
+                                          // Erlaube Zahlen, Punkt und Komma
+                                          let cleanText = text.replace(',', '.');
+                                          cleanText = cleanText.replace(/[^0-9.]/g, '');
+                                          const dotCount = (cleanText.match(/\./g) || []).length;
+                                          if (dotCount > 1) {
+                                            const parts = cleanText.split('.');
+                                            cleanText = parts[0] + '.' + parts.slice(1).join('');
+                                          }
+                                          setEditingValue(cleanText);
+                                        }}
+                                        onBlur={() => {
+                                          const value = parseFloat(editingValue);
+                                          if (!isNaN(value) && value > 0) {
+                                            if ((investment.amountType || 'euro') === 'euro') {
+                                              // Konvertiere Euro in % für Validierung
+                                              const percentage = (value / availableLiquid) * 100;
+                                              const validation = validatePercentageLimit(investment.id, percentage);
+
+                                              if (!validation.valid && validation.message) {
+                                                setValidationErrors(prev => ({ ...prev, [investment.id]: validation.message! }));
+                                              } else {
+                                                setValidationErrors(prev => {
+                                                  const newErrors = { ...prev };
+                                                  delete newErrors[investment.id];
+                                                  return newErrors;
+                                                });
+                                              }
+
+                                              handleUpdateInvestment(investment.id, 'amount', value);
+                                            } else {
+                                              // Validiere Prozentsatz-Limit
+                                              const validation = validatePercentageLimit(investment.id, value);
+
+                                              if (!validation.valid && validation.message) {
+                                                setValidationErrors(prev => ({ ...prev, [investment.id]: validation.message! }));
+                                              } else {
+                                                setValidationErrors(prev => {
+                                                  const newErrors = { ...prev };
+                                                  delete newErrors[investment.id];
+                                                  return newErrors;
+                                                });
+                                              }
+
+                                              const euroAmount = (availableLiquid * value) / 100;
+
+                                              // BEIDE Werte in einem Update setzen!
+                                              updatePrognoseData({
+                                                ...prognoseData,
+                                                investments: prognoseData.investments.map((inv) =>
+                                                  inv.id === investment.id ? { ...inv, percentageAmount: value, amount: euroAmount } : inv
+                                                )
+                                              });
+                                            }
+                                          }
+                                          setEditingField(null);
+                                          setEditingValue('');
+                                        }}
+                                        keyboardType="default"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <TouchableOpacity
+                                        onPress={() => {
+                                          const currentValue = (investment.amountType || 'euro') === 'euro'
+                                            ? investment.amount
+                                            : (investment.percentageAmount || 0);
+                                          setEditingValue(currentValue.toString());
+                                          setEditingField(`amount-${investment.id}`);
+                                        }}
+                                        style={styles.flexOne}
+                                      >
+                                        <Text style={styles.investmentInputValueInline}>
+                                          {(investment.amountType || 'euro') === 'euro'
+                                            ? Math.round(investment.amount)
+                                            : (investment.percentageAmount || 0).toFixed(1)}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity
+                                      onPress={() => {
+                                        const currentType = investment.amountType || 'euro';
+                                        const newType = currentType === 'euro' ? 'percentage' : 'euro';
+                                        handleUpdateInvestment(investment.id, 'amountType', newType);
+
+                                        // Wenn im Edit-Modus, schließe das Feld
+                                        if (editingField === `amount-${investment.id}`) {
+                                          setEditingField(null);
+                                          setEditingValue('');
+                                        }
+                                      }}
+                                      style={styles.toggleButtonInline}
+                                    >
+                                      <Text style={styles.toggleButtonTextInline}>
+                                        {(investment.amountType || 'euro') === 'euro' ? '€' : '%'}
                                       </Text>
                                     </TouchableOpacity>
-                                  )}
+                                  </View>
                                 </View>
 
-                                <View style={styles.investmentInputBlock}>
-                                  <Text style={styles.investmentInputLabel}>Rendite/Jahr:</Text>
-                                  {editingField === `return-${investment.id}` ? (
-                                    <TextInput
-                                      style={styles.investmentInput}
-                                      value={investment.annualReturn.toString()}
-                                      onChangeText={(text) => {
-                                        const cleanText = text.replace(',', '.');
-                                        const value = parseFloat(cleanText);
-                                        handleUpdateInvestment(investment.id, 'annualReturn', isNaN(value) ? 0 : value);
-                                      }}
-                                      onBlur={() => setEditingField(null)}
-                                      keyboardType="decimal-pad"
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    <TouchableOpacity onPress={() => setEditingField(`return-${investment.id}`)}>
-                                      <Text style={styles.investmentInputValue}>
-                                        {investment.annualReturn.toFixed(1)} %
-                                      </Text>
-                                    </TouchableOpacity>
-                                  )}
+                                <View style={[styles.investmentInputBlock, styles.returnInputBlock]}>
+                                  <View style={styles.returnInputRow}>
+                                    <Text style={styles.investmentInputLabel}>Rendite/Jahr:</Text>
+                                    {editingField === `return-${investment.id}` ? (
+                                      <TextInput
+                                        style={styles.returnInput}
+                                        value={editingValue}
+                                        onChangeText={(text) => {
+                                          // Erlaube Zahlen, Punkt und Komma
+                                          let cleanText = text.replace(',', '.');
+                                          // Erlaube nur Zahlen, Punkt und maximal einen Punkt
+                                          cleanText = cleanText.replace(/[^0-9.]/g, '');
+                                          const dotCount = (cleanText.match(/\./g) || []).length;
+                                          if (dotCount > 1) {
+                                            const parts = cleanText.split('.');
+                                            cleanText = parts[0] + '.' + parts.slice(1).join('');
+                                          }
+                                          setEditingValue(cleanText);
+                                        }}
+                                        onBlur={() => {
+                                          const value = parseFloat(editingValue);
+                                          console.log('Rendite onBlur - editingValue:', editingValue, 'parsed value:', value);
+                                          if (!isNaN(value) && value >= 0) {
+                                            handleUpdateInvestment(investment.id, 'annualReturn', value);
+                                          }
+                                          setEditingField(null);
+                                          setEditingValue('');
+                                        }}
+                                        keyboardType="default"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <TouchableOpacity
+                                        onPress={() => {
+                                          setEditingValue(investment.annualReturn.toString());
+                                          setEditingField(`return-${investment.id}`);
+                                        }}
+                                      >
+                                        <Text style={styles.returnInputValue}>
+                                          {investment.annualReturn.toFixed(1)} %
+                                        </Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
                                 </View>
                               </View>
 
@@ -1281,22 +1465,90 @@ export const PrognoseScreen: React.FC = () => {
 
                     <View style={styles.investmentInputs}>
                       <View style={styles.investmentInputBlock}>
-                        <Text style={styles.investmentInputLabel}>Betrag:</Text>
+                        <Text style={styles.investmentInputLabel}>
+                          {(investment.amountType || 'euro') === 'euro'
+                            ? 'Betrag:'
+                            : 'Betrag des verfügbaren Vermögens:'}
+                        </Text>
                         {editingField === `amount-${investment.id}` ? (
                           <TextInput
                             style={styles.investmentInput}
-                            value={investment.amount.toString()}
-                            onChangeText={(text) =>
-                              handleUpdateInvestment(investment.id, 'amount', parseFloat(text) || 0)
-                            }
-                            onBlur={() => setEditingField(null)}
-                            keyboardType="decimal-pad"
+                            value={editingValue}
+                            onChangeText={(text) => {
+                              // Erlaube Zahlen, Punkt und Komma
+                              let cleanText = text.replace(',', '.');
+                              cleanText = cleanText.replace(/[^0-9.]/g, '');
+                              const dotCount = (cleanText.match(/\./g) || []).length;
+                              if (dotCount > 1) {
+                                const parts = cleanText.split('.');
+                                cleanText = parts[0] + '.' + parts.slice(1).join('');
+                              }
+                              setEditingValue(cleanText);
+                            }}
+                            onBlur={() => {
+                              const value = parseFloat(editingValue);
+                              if (!isNaN(value) && value > 0) {
+                                if ((investment.amountType || 'euro') === 'euro') {
+                                  // Konvertiere Euro in % für Validierung
+                                  const percentage = (value / availableLiquid) * 100;
+                                  const validation = validatePercentageLimit(investment.id, percentage);
+
+                                  if (!validation.valid && validation.message) {
+                                    setValidationErrors(prev => ({ ...prev, [investment.id]: validation.message! }));
+                                  } else {
+                                    setValidationErrors(prev => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[investment.id];
+                                      return newErrors;
+                                    });
+                                  }
+
+                                  handleUpdateInvestment(investment.id, 'amount', value);
+                                } else {
+                                  // Validiere Prozentsatz-Limit
+                                  const validation = validatePercentageLimit(investment.id, value);
+
+                                  if (!validation.valid && validation.message) {
+                                    setValidationErrors(prev => ({ ...prev, [investment.id]: validation.message! }));
+                                  } else {
+                                    setValidationErrors(prev => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[investment.id];
+                                      return newErrors;
+                                    });
+                                  }
+
+                                  const euroAmount = (availableLiquid * value) / 100;
+
+                                  // BEIDE Werte in einem Update setzen!
+                                  updatePrognoseData({
+                                    ...prognoseData,
+                                    investments: prognoseData.investments.map((inv) =>
+                                      inv.id === investment.id ? { ...inv, percentageAmount: value, amount: euroAmount } : inv
+                                    )
+                                  });
+                                }
+                              }
+                              setEditingField(null);
+                              setEditingValue('');
+                            }}
+                            keyboardType="default"
                             autoFocus
                           />
                         ) : (
-                          <TouchableOpacity onPress={() => setEditingField(`amount-${investment.id}`)}>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const currentValue = (investment.amountType || 'euro') === 'euro'
+                                ? investment.amount
+                                : (investment.percentageAmount || 0);
+                              setEditingValue(currentValue.toString());
+                              setEditingField(`amount-${investment.id}`);
+                            }}
+                          >
                             <Text style={styles.investmentInputValue}>
-                              {Math.round(investment.amount)} €
+                              {(investment.amountType || 'euro') === 'euro'
+                                ? `${Math.round(investment.amount)} €`
+                                : `${(investment.percentageAmount || 0).toFixed(1)} %`}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -1307,18 +1559,36 @@ export const PrognoseScreen: React.FC = () => {
                         {editingField === `return-${investment.id}` ? (
                           <TextInput
                             style={styles.investmentInput}
-                            value={investment.annualReturn.toString()}
+                            value={editingValue}
                             onChangeText={(text) => {
-                              const cleanText = text.replace(',', '.');
-                              const value = parseFloat(cleanText);
-                              handleUpdateInvestment(investment.id, 'annualReturn', isNaN(value) ? 0 : value);
+                              // Erlaube Zahlen, Punkt und Komma
+                              let cleanText = text.replace(',', '.');
+                              cleanText = cleanText.replace(/[^0-9.]/g, '');
+                              const dotCount = (cleanText.match(/\./g) || []).length;
+                              if (dotCount > 1) {
+                                const parts = cleanText.split('.');
+                                cleanText = parts[0] + '.' + parts.slice(1).join('');
+                              }
+                              setEditingValue(cleanText);
                             }}
-                            onBlur={() => setEditingField(null)}
-                            keyboardType="decimal-pad"
+                            onBlur={() => {
+                              const value = parseFloat(editingValue);
+                              if (!isNaN(value) && value >= 0) {
+                                handleUpdateInvestment(investment.id, 'annualReturn', value);
+                              }
+                              setEditingField(null);
+                              setEditingValue('');
+                            }}
+                            keyboardType="default"
                             autoFocus
                           />
                         ) : (
-                          <TouchableOpacity onPress={() => setEditingField(`return-${investment.id}`)}>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setEditingValue(investment.annualReturn.toString());
+                              setEditingField(`return-${investment.id}`);
+                            }}
+                          >
                             <Text style={styles.investmentInputValue}>
                               {investment.annualReturn.toFixed(1)} %
                             </Text>
@@ -1452,21 +1722,39 @@ export const PrognoseScreen: React.FC = () => {
               {editingField === 'inflation' ? (
                 <TextInput
                   style={styles.prognoseInput}
-                  value={prognoseData.inflationRate.toString()}
+                  value={editingValue}
                   onChangeText={(text) => {
-                    const cleanText = text.replace(',', '.');
-                    const value = parseFloat(cleanText);
-                    updatePrognoseData({
-                      ...prognoseData,
-                      inflationRate: isNaN(value) ? 2.0 : value
-                    });
+                    // Erlaube Zahlen, Punkt und Komma
+                    let cleanText = text.replace(',', '.');
+                    cleanText = cleanText.replace(/[^0-9.]/g, '');
+                    const dotCount = (cleanText.match(/\./g) || []).length;
+                    if (dotCount > 1) {
+                      const parts = cleanText.split('.');
+                      cleanText = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                    setEditingValue(cleanText);
                   }}
-                  onBlur={() => setEditingField(null)}
-                  keyboardType="decimal-pad"
+                  onBlur={() => {
+                    const value = parseFloat(editingValue);
+                    if (!isNaN(value) && value >= 0) {
+                      updatePrognoseData({
+                        ...prognoseData,
+                        inflationRate: value
+                      });
+                    }
+                    setEditingField(null);
+                    setEditingValue('');
+                  }}
+                  keyboardType="default"
                   autoFocus
                 />
               ) : (
-                <TouchableOpacity onPress={() => setEditingField('inflation')}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditingValue(prognoseData.inflationRate.toString());
+                    setEditingField('inflation');
+                  }}
+                >
                   <Text style={styles.prognoseInputValue}>{prognoseData.inflationRate.toFixed(1)} %</Text>
                 </TouchableOpacity>
               )}
@@ -1479,7 +1767,7 @@ export const PrognoseScreen: React.FC = () => {
           <View style={styles.liquidInfoRow}>
             <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
             <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
-              {Math.round(returns.year1.nominalReturn)} €
+              {Math.round(returns.year1.nominalReturn)} € ({returns.year1.nominalReturnRate.toFixed(2)}%)
             </Text>
           </View>
 
@@ -1505,7 +1793,7 @@ export const PrognoseScreen: React.FC = () => {
           <View style={styles.liquidInfoRow}>
             <Text style={styles.liquidInfoLabel}>Nominalrendite:</Text>
             <Text style={[styles.liquidInfoValue, { color: financeColors.incomeDark }]}>
-              {Math.round(returns.fullPeriod.nominalReturn)} €
+              {Math.round(returns.fullPeriod.nominalReturn)} € ({returns.fullPeriod.nominalReturnRate.toFixed(2)}%)
             </Text>
           </View>
 
@@ -1562,18 +1850,16 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   desktopBottomRow: {
-    flexDirection: 'row',
+    flexDirection: 'column-reverse',
     gap: 16,
     marginBottom: 16,
-    alignItems: 'flex-start'
+    alignItems: 'stretch'
   },
   desktopBottomLeft: {
-    flex: 1,
-    minWidth: 0
+    width: '100%'
   },
   desktopBottomRight: {
-    flex: 2,
-    minWidth: 0
+    width: '100%'
   },
   card: {
     margin: 16,
@@ -1776,16 +2062,25 @@ const styles = StyleSheet.create({
   },
   investmentInputs: {
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    gap: 8
   },
   investmentInputBlock: {
     flex: 1,
     marginHorizontal: 4
   },
+  amountInputBlockGreen: {
+    backgroundColor: financeColors.incomeLight,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 0,
+    flex: 2
+  },
   investmentInputLabel: {
     fontSize: 12,
     color: financeColors.textSecondary,
-    marginBottom: 4
+    marginBottom: 0
   },
   investmentInput: {
     fontSize: 14,
@@ -2214,5 +2509,101 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: financeColors.textPrimary
+  },
+  amountTypeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  toggleButton: {
+    backgroundColor: financeColors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginLeft: 8
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: financeColors.textPrimary
+  },
+  returnInputBlock: {
+    backgroundColor: financeColors.incomeLight,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 0,
+    flex: 1
+  },
+  returnInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  returnInput: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: financeColors.textPrimary,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    textAlign: 'center',
+    minWidth: 60
+  },
+  returnInputValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: financeColors.textPrimary,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    textAlign: 'center',
+    minWidth: 60
+  },
+  inputWithToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  flexOne: {
+    flex: 1,
+  },
+  investmentInputInline: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: financeColors.textPrimary,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    textAlign: 'center',
+  },
+  investmentInputValueInline: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: financeColors.textPrimary,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    textAlign: 'center',
+  },
+  toggleButtonInline: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleButtonTextInline: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: financeColors.textPrimary,
   }
 });
