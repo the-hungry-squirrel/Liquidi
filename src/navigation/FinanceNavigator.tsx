@@ -62,13 +62,15 @@ export default function FinanceNavigator() {
           tabBarActiveTintColor: theme.colors.primary,
           tabBarInactiveTintColor: 'gray',
           tabBarStyle: {
-            width: '100%',
+            paddingHorizontal: 0,
             paddingLeft: 0,
             paddingRight: 0,
           },
+          tabBarContentContainerStyle: {
+            width: '100%',
+          },
           tabBarItemStyle: {
             flex: 1,
-            maxWidth: '33.333%',
           },
           headerStyle: {
             backgroundColor: theme.colors.surface,
