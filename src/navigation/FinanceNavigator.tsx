@@ -18,7 +18,7 @@ const LogoHeader = () => {
   return (
     <View style={styles.headerContainer}>
       <Image
-        source={require('../../ee34a9e6-fee0-40c7-ac3c-e0703a106a04.png')}
+        source={require('../../assets/logo.png')}
         style={styles.headerLogo}
         resizeMode="contain"
       />
