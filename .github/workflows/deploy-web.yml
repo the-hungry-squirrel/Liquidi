@@ -33,7 +33,9 @@ jobs:
         run: npm ci
 
       - name: Build web app
-        run: npx expo export --platform web --output-dir dist --public-url /Liquidi
+        run: npx expo export --platform web --output-dir dist
+        env:
+          EXPO_PUBLIC_URL: /Liquidi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
