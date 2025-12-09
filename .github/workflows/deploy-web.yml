@@ -38,13 +38,15 @@ jobs:
       - name: Fix paths for GitHub Pages subdirectory
         run: |
           cd dist
-          # Replace all absolute paths with subdirectory paths in ALL files
-          find . -type f -name "*.js" -exec sed -i 's|"/_expo/|"/Liquidi/_expo/|g' {} +
-          find . -type f -name "*.html" -exec sed -i 's|"/_expo/|"/Liquidi/_expo/|g' {} +
-          find . -type f -name "*.html" -exec sed -i 's|href="/|href="/Liquidi/|g' {} +
-          find . -type f -name "*.html" -exec sed -i 's|src="/|src="/Liquidi/|g' {} +
-          # Fix double slashes that might occur
-          find . -type f \( -name "*.js" -o -name "*.html" \) -exec sed -i 's|/Liquidi/Liquidi/|/Liquidi/|g' {} +
+          # Fix all absolute paths in HTML and JS files
+          # 1. Fix script and favicon paths in HTML
+          sed -i 's|src="/_expo/|src="/Liquidi/_expo/|g' index.html
+          sed -i 's|href="/favicon|href="/Liquidi/favicon|g' index.html
+
+          # 2. Fix asset paths in JavaScript bundles (assets and fonts)
+          find . -name "*.js" -type f -exec sed -i 's|"/assets/|"/Liquidi/assets/|g' {} +
+          find . -name "*.js" -type f -exec sed -i 's|"assets/|"Liquidi/assets/|g' {} +
+
           # Create a 404.html for SPA routing
           cp index.html 404.html
 
