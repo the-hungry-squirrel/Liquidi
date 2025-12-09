@@ -38,12 +38,8 @@ jobs:
       - name: Fix asset paths for GitHub Pages
         run: |
           cd dist
-          # Replace absolute paths with relative paths in ALL files
-          find . -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" \) -exec sed -i 's|"\(/[^"]*\.\(png\|jpg\|jpeg\|svg\|gif\|webp\|woff\|woff2\|ttf\|eot\)\)"|".\1"|g' {} +
-          find . -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" \) -exec sed -i "s|'\\(/[^']*\\.\\(png\\|jpg\\|jpeg\\|svg\\|gif\\|webp\\|woff\\|woff2\\|ttf\\|eot\\)\\)'|'.\\1'|g" {} +
-          # Fix script and link tags in HTML
-          sed -i 's|href="/|href="./|g' index.html
-          sed -i 's|src="/|src="./|g' index.html
+          # Add base tag to HTML to fix all relative paths
+          sed -i 's|<head>|<head><base href="/Liquidi/">|' index.html
           # Create a 404.html for SPA routing
           cp index.html 404.html
 
